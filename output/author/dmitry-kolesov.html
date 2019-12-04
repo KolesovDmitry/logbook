@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+        <meta charset="utf-8" />
+        <title>Список всего - Dmitry Kolesov</title>
+        <link rel="stylesheet" href="https://kolesovdmitry.github.io/logbook/theme/css/main.css" />
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
+                <nav><ul>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/estimating-occupancy-using-spatially-and-temporally-replicated-snow-surveys.html">Estimating occupancy using spatially and temporally replicated snow surveys</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2019-12-03T00:00:00+03:00">
+                Published: Вт 03 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи 
+<a href="https://zslpublications.onlinelibrary.wiley.com/doi/abs/10.1111/acv.12140">J. Whittington, K. Heuer, B. Hunt, M. Hebblewhite, and P. M. Lukacs, 
+“Estimating occupancy using spatially and temporally replicated snow surveys: Estimating occupancy by snow surveys,” 
+Anim Conserv, vol. 18, no. 1, pp. 92–101, Feb. 2015.</a></strong></p>
+<h2>Суть задачи</h2>
+<p>Нужно разработать методику подсчета числа особей определенных видов животных на некой территории, используя наблюдения следов животных. В статье разобран пример на россомах и рысях в Национальном парке Банф (Канада).</p>
+<h2>Сбор данных</h2>
+<h3>Как делили территорию</h3>
+<p>Всю территорию Национального парка поделили на правильные шестиугольники (ячейки) площадью 100 кв. км. (площадь базового участка зависит от подвижности вида). Затем по территории проложили лыжные маршуты и ходили по ним с февраля по апрель. Каждый маршрут разделили на километровые сегменты, в каждом сегменте отмечали присутствие или отсутствие каждого вида.</p>
+<p>На следующей карте показаны шестиугольники и маршруты с указанием того, сколько раз был обследован каждый сегмент. Каждая точка на карте отмечает сегмент в один километр, закрашеные точки отмечают присутсвие следов россомахи в данном сегменте.</p>
+<p><img alt="Area Of Interst" src="images/2019-12-02/Figure1-1.png" title="На карте показано сколько раз был обследован каждый 1км сегмент."></p>
+<h3>Что и как собирали</h3>
+<p>На маршруте исследователи должны были для каждого сегмента отметить:</p>
+<ul>
+<li>присутствие/отсуствие следов каждого анализируемого вида;</li>
+<li>оценочное число дней <span class="math">\(DaysSnow\)</span>, в течение которых могли быть заметны следы присутствия животных (зависело от интенсивности снегопадов, солнечной и ветренной погоды), для каждого вида это число дней подбиралось индивидуально (некоторые следы держатся дольше, некоторые меньше). Авторы пишут, что они при дальнейших расчетах центрировали <span class="math">\(DaysSnow\)</span> вокруг среднего (получились разные центры для копытных и хищников) и поделили на стандартное отклонение.</li>
+</ul>
+<h2>Вычисления</h2>
+<p>Авторы использовали четыре модели, описывающие различные предположения о структуре зависимостей данных: с учетом и без учета пространственныых и временных автокорреляций.</p>
+<p>Обозначения:</p>
+<ul>
+<li><span class="math">\(y_{ijk}\)</span> -- были ли обнаружены следы присутствия животного в ячейке номер <span class="math">\(i\)</span>, на <span class="math">\(j\)</span>-м километре (сегменте) пути в ходе <span class="math">\(k\)</span>-го по счету исследования;</li>
+<li><span class="math">\(\psi\)</span> -- вероятность того, что животное находилось в ячейке;</li>
+<li><span class="math">\(p\)</span> -- вероятность того, что были детектированы следы присутствия животного, при условии, что оно находилось в ячейке;</li>
+<li><span class="math">\(M\)</span> -- число обследованных ячеек.</li>
+</ul>
+<p>Основные предположения:
+ * факт того, что в некоторой ячейке находится животное, не зависит от того, есть или нет животное в других ячейках;
+ * животные не перемещаются между ячейками в течении процедуры исследования.</p>
+<p>При таких предположениях наличие животных в ячейках можно смоделировать на базе схемы испытаний Бернулли, а величина <span class="math">\(\psi\)</span> в таком случае будет пропорцией занятых ячеек. Авторы моделируют <span class="math">\(\psi\)</span>, вероятность присутствия животного в ячейке, в виде логистической функции от параметров среды:</p>
+<div class="math">$$
+logit(\psi) \equiv \log\left( \frac{\psi}{1 - \psi} \right) = \beta_{\psi}
+$$</div>
+<p>Затем строятся функции правдоподобия <span class="math">\(L\)</span>, различающиеся лежащими в их основе предположениями о зависимостях.</p>
+<h3>Модель 1</h3>
+<p>В основу модели была положена разработка из [1].</p>
+<p>Функция правдоподобия согласно данной модели вычисляется по формуле:</p>
+<div class="math">$$
+L(y | \psi, p) = \prod_{i=1}^M \left\{ Bin(y_i | K, p)\psi + I(d_i =0)(1-\psi) \right\},
+$$</div>
+<p>здесь <span class="math">\(y_i\)</span> -- число, означающее сколько раз было детектировано животное в ячейке <span class="math">\(i\)</span> в течении <span class="math">\(K\)</span> посещений ячеки; <span class="math">\(d_i\)</span> означает общее количество обнаружений животного в ячейке <span class="math">\(i\)</span>; <span class="math">\(I(.)\)</span> -- индикаторная функция, принимающая значение 1, если аргумент истинный и 0 в противном случае.</p>
+<p>Первое слагаемое внутри скобок представляет собой вероятность того, что ячейка была занята животным, она рассчитывается по биномиальной модели. Второе слагаемое описывает ячейки, в которых животные не были обнаружены и в которых действительно нет животных.</p>
+<p><em>Замечание 1 (КД):</em> Немного странная формула. Больше похоже на то, что она описывает не функцию правдоподобия обнаружения, а функцию правдоподобия <em>не обнаружения</em>. В о всяком случае слагаемое <span class="math">\(I(d_i =0)(1-\psi)\)</span> означает именно это: вероятность необнаружения животного при условии, что оно действительно отсутствует в ячейке. Логично тогда его складывать с <em>вероятностью необнаружения</em> животного при условии, что оно там присутсвует, т.е. <span class="math">\(Bin(y_i | K, p)\psi\)</span> должно быть вероятностью <em>пропуска</em> следов животного.</p>
+<p><em>Замечание 2 (КД):</em> В исходной статье, на которую ссылается J. Whittington и соавторы, приводится совсем другая функция правдоподобия (если привести ее в соответствии с обозначениями данной статьи):
+</p>
+<div class="math">$$
+L(y | \psi, p) = \left [ \psi^{y_i} \prod_{i=1}^K p^{d_i} (1-p)^{K-d_i} \right ] \times \left [\psi \prod_{i=1}^K (1-p) + (1-\psi) \right]^{K-d_i}
+$$</div>
+<p>
+Как видим, здесь второе произведение означает именно суммарную вероятность того, что животное <em>не будет обнаружено</em> в ходе <span class="math">\(K\)</span> посещений ячейки.
+К сожалению,  J. Whittington и соавторы не дают ни малейшего намека, как они получили свою формулу из исходной. </p>
+<h3>Модель 2</h3>
+<p>Данная модель разработана J. Whittington и соавторами и исходит из предположения, что вероятность детекции следов животного для различных ячеек и различных посещений ячейки независимы друг от друга и взаимозаменяемы:
+</p>
+<div class="math">$$
+L(y | \psi, p) = \prod_{i=1}^M \left\{ \left ( \prod_{j=1}^{J_i} \prod_{k=1}^{K_{ij}} p_{ijk}^{y_{ijk}} (1-p_{ijk})^{1-y_{ijk}}   \right) \psi + I(d_i =0)(1-\psi) \right\}.
+$$</div>
+<p>
+где <span class="math">\(logit(p_{ijk}) = \alpha_{intercept} + \alpha_{DaysSnow} DaysSnow_{ijk}\)</span>. Что такое <span class="math">\(J_i\)</span> авторы не говорят, но можно предположить, что это число километровых сегментов, лежащих на маршруте внутри ячейки <span class="math">\(i\)</span>, аналогично можно предположить, что <span class="math">\(K_{ij}\)</span> -- число сегментов, пройденных в ходе <span class="math">\(k\)</span>-го посещения ячейки <span class="math">\(i\)</span>.</p>
+<p><em>Замечание 3 (КД):</em> Похоже, в статье есть опечатка в этой формуле: в ней был пропущен еще знак произведения "<span class="math">\(\prod_{i=1}^M\)</span>", вычисляющий произведение вероятностей по всем ячейкам. Выше я привожу исправленную формулу.</p>
+<p><em>Замечание 4 (КД):</em> Авторы утверждают, что данная модель основывается на модели из [2]. Стоит поднять эту статью, если придется разбираться в данной методике глубже.</p>
+<h3>Модель 3</h3>
+<p>Данная модель устроена по типу Модели 2 за исключением того, что вероятность детекции считается авторегрессионной (по пространственным координатам). Т.е. они вводят такое условие:
+</p>
+<div class="math">$$
+logit(p_{ijk}) = \alpha_{intercept} + \alpha_{ylag} y_{i, j-1, k}+ \alpha_{DaysSnow} DaysSnow_{ijk}.
+$$</div>
+<p>
+Для самой первой ячейки маршрута не определено, есть ли в предыдущей (т.е. необследованной) ячейке следы присутствия животных или нет. Авторы предлагают использовать взвешенное среднее для вероятности детекции этой ячейки.</p>
+<p>Данная модель, как и последующая, четвертая, моделирует наличие животных на двух масштабных уровнях: на уровне ячейки и на уровне сегмента маршрута.</p>
+<p>В данной модели предполагается, что если в ячейке находится животное (следы), то для сегментов маршрута можно указать условную вероятность присутствия животного <span class="math">\(\theta = Pr(\text{segment is occuped}| \text{cell is ocupped})\)</span>. Считается, что вероятность присутствия животного в одном сегменте не влияет на вероятность присутствия животного в других сегментах маршрута для данной ячейки (более того, она одинаковая для всех ячеек, где присутствуют животные). Соотвественно, <span class="math">\(\psi \theta\)</span> -- вероятность того, что в сегменте будут находиться следы животного.</p>
+<p>Для вычисления вероятности детекции животного используются множественные обследования сегментов (т.е. проходы по ним несколько раз). Вероятность <span class="math">\(\theta\)</span> ищется в форме <span class="math">\(logit(\theta) = \beta_{\theta}\)</span>. Итоговая модель выглядит следующим образом:</p>
+<div class="math">$$
+L(y | \psi, p, \theta) = 
+    \prod_{i=1}^M \left\{ 
+            \prod_{j=1}^{J_i} 
+                \left ( \Big[ 
+                    \prod_{k=1}^{K_{ij}} p_{ijk}^{y_{ijk}} (1-p_{ijk})^{1-y_{ijk}}   
+                \Big] \theta 
+                + I(d_{ij} =0)(1-\theta) 
+        \right )\psi
+        + I(d_i = 0)(1-\psi)
+    \right\}.
+$$</div>
+<p>
+Здесь <span class="math">\(d_{ij}\)</span> должно означать, сколько раз были встречены следы животного на сегменте <span class="math">\(j\)</span> ячейки <span class="math">\(i\)</span> (правда, авторы не пишут, что стоит за этим символом).</p>
+<h3>Модель 4</h3>
+<p>Это расширение Модели 3. Здесь вероятность присутсвия животного в ячейки счтитается авторегрессивной, точнее, зависящей от наличия животного в предыдущем сегменте:
+</p>
+<div class="math">$$
+logit(\theta) = \beta_{\theta} + \beta_{\theta} \Phi_{ij-1},
+$$</div>
+<p>
+где <span class="math">\(\Phi\)</span> -- скрытая переменная, означающая находилось ли животное в предсшествующем сегменте. Авторы ссылаются на работу [2], за тем отличием, что в Модели 4 присутствуют повторные испытания во времени (повторные проходы по ячейкам).</p>
+<h2>Дальнейшие действия</h2>
+<p>В этом разделе очень сжато описываю содержание остальной части статьи:</p>
+<ul>
+<li>Параметры моделей авторы вычиляли в R, используя Байесовский подход и классический метод максимального правдоподобия.</li>
+<li>Далее авторы исследовали вопрос взаимосвязи пространственной и временной корреляции, насколько пространсвенная репликация может быть заменена временной и наоборот. Для проверки авторы использовали компьютерную симуляцию (задавали параметры распределения и смотрели предсказанные статистики).</li>
+<li>Затем авторы произвели подсчеты числа занятых животными ячеек, основываясь на описанных выше моделях и собранных данных.</li>
+</ul>
+<h2>Основные ссылки</h2>
+<p>[1] MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Andrew Royle, J. &amp; Langtimm, C.A. (2002). Estimating site occupancy rates when detection
+probabilities are less than one. Ecology 83, 2248–2255.</p>
+<p>[2] Hines, J., Nichols, J., Royle, J., MacKenzie, D., Gopalaswamy, A., Kumar, N.S. &amp; Karanth, K. (2010).
+Tigers on trails: occupancy modeling for cluster sampling. Ecol. Appl. 20, 1456–1466.</p>
+<h1>Комментарии</h1>
+<p>Статья выглядит довольно неопрятно с математической точки зрения, и дело тут не столько в опечатках внутри формул, сколько в том, что авторы не всегда описывают, что обозначают те или иные символы внутри выражений, в итоге читателю приходится догадываться об из значении по смыслу. Более того, авторы ссылаются на формулы в других работах, которые в цитируемой статье или отсутствуют, или означают иное (см. Замечание 2). Как минимум эти недочеты или ошибки должны были быть исправлены еще на этапе рецензирования работы, они очень подрывают доверие ко всей работе. Поэтому я бы не рекоммендовал глубоко копаться в формулах данной статьи, и считаю, что лучше обратиться к сразу к первоисточникам: данная работа годится для составления общего впечатления о методике, но не о деталях вычислений и лежащих в основе методики предположений и ограничений.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+        <section id="extras" class="body">
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
