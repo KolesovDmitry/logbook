@@ -4,8 +4,8 @@ tags: Occupancy models
 Category: Review
 
 
-**Обзор основных методов статьи**
-[Tigers on trails: occupancy modeling for cluster sampling](https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1)
+**Обзор основных методов статьи
+[Tigers on trails: occupancy modeling for cluster sampling](https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1)**
 
 
 ## Суть задачи
