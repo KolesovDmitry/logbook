@@ -16,7 +16,153 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/patterns-of-snow-leopard-site-use-in-an-increasingly-human-dominated-landscape.html">Patterns of Snow Leopard Site Use in an Increasingly Human-Dominated Landscape</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2019-12-09T00:00:00+03:00">
+                Published: Пн 09 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи</strong>
+<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></p>
+<h2>Суть задачи</h2>
+<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. При этом ожидается, что данные по следам
+присутсвия животных:</p>
+<ul>
+<li>локально зависимы (более точно -- подчиняются Марковскому закону);</li>
+<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис между статистическим и практическими требваниями (обычно логистического плана).</li>
+</ul>
+<p>Предлагаемая методика использовалась для оценки ареала тигров в штате Карнатака (Индия).</p>
+<h2>Сбор данных</h2>
+<h3>Как делили территорию и собирали данные</h3>
+<p>Исследуемая территория занимает 22 тыс. кв. км. и расположена в штате Карнатака на юго-западе Индии. Поскольку известно, что тигры используют лесные дороги и помечают свою территорию, оставляя различные следы на дорогах, то поиск таких следов вдоль дорог занчительно повышает вероятность детекции тигра по сравнению со случайным поиском (построением случайных ячеек и их обследованием).</p>
+<p>Таким образом территория разбивалась на ячейки в 200 кв. километров (средний размер "домашней" территории тигра), внутри анализируемых ячеек случайным образом выбиралась точка, через которую прокладывался маршрут (с проходом по дорогам). Затем по маршруту проходили исследователи и искали следы присутсвия тигров. Каждый маршрут разбивался на участки длиной в один километр. </p>
+<p>На каждом сегменте отмечалось присутствие или отсуствие следов животных в виде бинарной величины.</p>
+<h2>Вычисления</h2>
+<p>Поскольку методика подразумевает анализ ареалов очень подвижных животных, которые могут передвигаться по дорогам иногда до нескольких километров, то вероятность встретить следы животного на следующем сегменте маршрута повышается, если следы были замечены на текущем сегменте. Таким образом в основе модели лежит идея использовать Марковские процессы и схему выборки с возвращением. Более конкретно:</p>
+<ul>
+<li>выбирается ячейка для анализа;</li>
+<li>начинается маршрут, состоящий из <span class="math">\(K\)</span> последовательных сегментов;</li>
+<li>записывается история встреч следов животного на маршруте (бинарная величина, есть следы или нет);</li>
+<li>по завершению маршрута получается бинарный вектор из <span class="math">\(K\)</span> нулей и единиц, например, для ячейки <span class="math">\(j\)</span>, состоящей из пяти сегментов, может быть получена следующая история: <span class="math">\(h_j = 01011\)</span>, означающая, что следы не были обнаружены на 1-м и 3-м сегменте маршрута.</li>
+</ul>
+<p>Как обычно, в модели учитываются вероятности того, что животное (его следы) может быть не обнаружено, хотя по факту оно присутствует.</p>
+<p>Вводятся обозначения:</p>
+<ul>
+<li><span class="math">\(p\)</span> - вероятность детекции следов на сегменте, при условии, что животное (следы) находилось в ячейке;</li>
+<li><span class="math">\(\psi\)</span> - вероятность того, что животное (следы) находилось в ячейке;</li>
+<li><span class="math">\(\theta\)</span> - вероятность того, что животное (следы) находилось на сегменте при условии, что ячейка занята животным и животное не посещало предыдущий сегмент;</li>
+<li><span class="math">\(\theta'\)</span> - вероятность того, что животное находилось на сегменте при условии, что ячейка была занята животным и следы животного были найдены на предыдущем сегменте.</li>
+</ul>
+<p>Эта схема позволяет задать Марковский процесс с ненаблюдаемой случайной переменной, означающей, было ли животное на предыдущем сегменте. Например, для следующей истории наблюдений <span class="math">\(h_j = 01011\)</span> данный процесс выражается следущей формулой:</p>
+<div class="math">$$
+Pr(h_j = 01011) = \underbrace{\psi}_{\text{тигр в ячейке}}
+       \underbrace{\Big[ \underbrace{(1-\theta)}_\text{тигра нет на сегм.}\theta + \underbrace{\theta(1-p)}_\text{тигр пропущен}\theta'\Big ]}_\text{I сегм.}
+       \underbrace{\underbrace{p}_\text{следы найдены}}_\text{II сегм.}
+       \underbrace{[(1-\theta ')\theta + \theta' (1-p)\theta']}_\text{III сегм.}
+       \underbrace{p}_\text{IV сегм.}
+       \underbrace{\theta' p}_\text{V сегм.}
+$$</div>
+<p>В этой формуле учитывается то, что если следов животных на сегменте не было обнаружено, то это может быть потому, что животного действительно там нет. Поэтому, рассматривая тот факт, что следы животного найдены на втором сегменте, мы не знаем, с какой именно вероятностью имеем дело (<span class="math">\(\theta\)</span> или <span class="math">\(\theta'\)</span>), следовательно вероятность не обнаружить следы в первом сегменте получаются в виде суммы произведения вероятностей.</p>
+<p>В случае, когда в ячейке не было обнаружено следов присуствия, также рассматривается две возможности -- отсуствие животного и его пропуск. Например, для маршрута состоящего из двух сегментов:</p>
+<div class="math">$$
+Pr(h_j = 00) = (1-\psi) + \psi\Big [\theta (1-p)(1-\theta' p) + (1-\theta)(1-\theta p) \Big].
+$$</div>
+<p>Таким образом вся история наблюдений описывается функцией правдоподобия:
+</p>
+<div class="math">$$
+L(\psi, \theta, \theta', p | h_1,h_2,\dots, h_s) = \prod_{j=1}^s Pr(h_j).
+$$</div>
+<p><em>Замечание 1.</em> Таким образом в модели подразумевается, что для всех ячеек и всех сегментов все вероятности равны между собой, т.е. <span class="math">\(p\)</span>, <span class="math">\(\theta\)</span> и <span class="math">\(\theta'\)</span> не зависят от местоположения.</p>
+<p>Реализация моделей производилась в программе PRESENCE [1].</p>
+<h2>Дальнейшие действия</h2>
+<p>Поскольку моя цель -- ознакомление с общими принципами, лежащими в основе моделей, то на этом этапе я останавливаюсь. Тем не менее следует сказать, что статья не заканчивается выводом модели. Далее авторы производят исследование методики на искусственно сгенерированных данных, изучают ошибки различных моделей. После исследования моделей авторы применяют модель к реальным данным -- поиску тигров.</p>
+<h1>Литература</h1>
+<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
+occupancy and related parameters. U.S. Geological Survey,
+Patuxent Wildlife Research Center, Laurel, Maryland, USA.
+hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
+<h1>Комментарии</h1>
+<p>Статья написана очень хорошо, дает достаточно полную картину, приводит логику вывода модели и сопровождает ее деталями. Видно, что авторы очень хорошо понимают, что делают и почему так, а не иначе. Очень рекомендую ее для введения в тематику.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/patterns-of-snow-leopard-site-use-in-an-increasingly-human-dominated-landscape.html" rel="bookmark"
+                           title="Permalink to Patterns of Snow Leopard Site Use in an Increasingly Human-Dominated Landscape">Patterns of Snow Leopard Site Use in an Increasingly Human-Dominated Landscape</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2019-12-04T00:00:00+03:00">
                 Published: Ср 04 декабря 2019
@@ -27,50 +173,14 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи 
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи 
 <a href="https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0155309">J. S. Alexander, A. M. Gopalaswamy, K. Shi, J. Hughes, and P. Riordan, “Patterns of Snow Leopard Site Use in an Increasingly Human-Dominated Landscape,” PLoS ONE, vol. 11, no. 5, p. e0155309, May 2016.
 </a></strong></p>
 <h2>Суть задачи</h2>
-<p>Исследуется распространение снежного барса (ирбиса) в условиях (а) сильного антропогенного влияния на территорию, (б) информации о присутсвии видов, которыми питаются барсы.</p>
-<p>Но из всей статьи нас интересуют в основном схемы организации экспериментов, сбора данных и вычислительные особенности моделей распространения, поэтому обзор производится с этой точки зрения.</p>
-<h2>Сбор данных</h2>
-<h3>Как делили территорию</h3>
-<p>Исследуемая территория находится в провинции Ганьсу (север центральной части Китая), см. схему ниже. </p>
-<p>В области интересов были размещены несколько квадратов (ячеек) размером в 16 кв.км., их площадь выбиралась исходя из того, что это минимальный размер "собственного участка" животного (home range). Всего было построено 212 ячеек из которых было выбрано случайным образом 49 штук для дальнейшего обследования. Некоторые квадраты попали в недоступную для людей зону, в этом случае выбирался соседний квадрат, ближайший к дороге.</p>
-<p><img alt="Area Of Interst" src="images/2019-12-05/fig1.png" title="На схеме показаны участки, которые были обследованы" width="90%"></p>
-<h3>Что и как собирали</h3>
-<p>В течении зимы 2014-го года с января по март исследователи ходили по выбранных квадратам. В каждом квадрате в течении дня проходили маршрут длиной 3-7 км. Эти маршруты планировались заранее так, чтобы минимизировать возможное влияние пространственной автокорреляции и обеспечить адекватное задаче покрытие квадрата.</p>
-<p>Каждый километр маршрута был разделен на сегменты размером 10x100 метров. В каждом сегменте отмечалось присутствие или отсутствие следов самого животного и следов присутвия видов-жертв, в расчет брались следы относительно недавнего присутствия (не более месяца). В итоге получалась бинарная величина по каждому виду присутсвует/остуствует для каждого сегмента.</p>
-<h2>Вычисления</h2>
-<p>Количество объясняющих переменных было сброшено до 3х из-за малой выборки (49 ячеек), объясняющие переменные были подобраны по данным предсшествующих иследваний: наличие добычи, наличие домашнего скота, расстояние до больших промышленных объектов.</p>
-<p>Вычисления проиводились в программе PRESENCE версии 8.8 [1]. Сравнение моделей происходило на базе AIC.</p>
-<p>Как таковые методы анализа в статье не описаны, в нужных местах просто даются ссылки на литературу для более глубокого погружения в тему. Основное что использовалось авторами:</p>
-<ol>
-<li>Строилась модель на базе [2], в которой в явном виде учитывается пространственная автокорреляции.</li>
-<li>Затем строилась модель из [3].</li>
-<li>Строилась модель из [4].</li>
-</ol>
-<p>После сравнения результатов работы моделей пришли к выводу, что модель на базе [2] оказалась для собранных данных лучше. В итоге на следующем шаге использовалась только эта модель.</p>
-<p>Далее авторы использовали выбранные предикторы (наличие добычи, скота, расстояния) и вероятность детекции следов животного моделировалась функцией этих предикторов по методу, описанному в [5]. После оценки вероятности детекции и выбора оптимальной модели для нее авторы пересчитали вероятность присуствия животного в ячейки пользуясь подходом, описанным в [5].</p>
-<h2>Основные ссылки</h2>
-<p>[1] Hines JE (2006) PRESENCE2—Software to estimate patch occupancy and related parameters. Avail-
-able: http://www.mbr-pwrc.gov/software/presence.html.</p>
-<p>[2] Hines JE, Nichols JD, Royle JA, MacKenzie DI, Gopalaswamy AM, et al. (2010) Tigers on trails: occu-
-pancy modeling for cluster sampling. Ecol Appl 20: 1456–1466. PMID: 20666261</p>
-<p>[3] MacKenzie DI, Nichols JD, Lachman GB, Droege S, Andrew Royle J, et al. (2002) Estimating site occu-
-pancy rates when detection probabilities are less than one. Ecology 83: 2248–2255</p>
-<p>[4] Royle JA, Nichols JD (2003) Estimating abundance from repeated presence-absence data or point
-counts. Ecology 84: 777–790.</p>
-<p>[5] Karanth KU, Gopalaswamy AM, Kumar NS, Vaidyanathan S, Nichols JD, et al. (2011) Monitoring carni-
-vore populations at the landscape scale: occupancy modelling of tigers from sign surveys. J Appl Ecol
-48: 1048–1056.</p>
-<h1>Комментарии</h1>
-<p>Статья не практически не содержит формул и описания условий применимости, но зато представляет неплохое словесное описание методики со ссылками на источники. Поэтому за деталями о лежащих в основе гипотезах и моделях следует идти в исходные работы.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>Исследуется распространение снежного барса (ирбиса) в условиях (а) сильного антропогенного …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/patterns-of-snow-leopard-site-use-in-an-increasingly-human-dominated-landscape.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
