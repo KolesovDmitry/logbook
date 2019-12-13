@@ -10,13 +10,137 @@
         <header id="banner" class="body">
                 <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
                 <nav><ul>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
                 </ul></nav>
         </header><!-- /#banner -->
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2019-12-09T00:00:00+03:00">
+                Published: Пн 09 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
+</footer><!-- /.post-info --><h1>Задача</h1>
+<p>Есть большая задача -- построение маски водных объектов по данным ДЗЗ, точнее Sentinel-2. Эта задача разбивается
+на множество отдельных подзадач, в частности сейчас решаем вопрос о сборе обучающих данных для алгоритмов маскирования.</p>
+<p>Для решения этой частной задачи нужно собрать данные Sentinel-2 на интересующую нас территорию и:</p>
+<ul>
+<li>удалить с них облака (возможно, и другие шумы);</li>
+<li>сделать временнУю аггрегацию по каждому каналу за определенный период времени (или несколько периодов);</li>
+<li>подключить дополнительные данные (например, по рельефу), если они нужны.</li>
+</ul>
+<p>Основная задача -- максимально быстро получить первый вариант классификатора, чтобы затем, пользуясь его результатами
+начинать собирать обучающие данные и дополнять их.</p>
+<h1>Ход работ</h1>
+<h2>1. Обучающие данные в первом приближении.</h2>
+<p>В первом приближении водные объекты можно взять в OSM. Они не полные, местами не совпадают с реальными положениями рек (особенно мелких) на снимках, но это очень хороший старт.</p>
+<p>Таким образом были импортированы из ОСМ данные по:</p>
+<ul>
+<li>прибрежная зона;</li>
+<li>площадные объекты внутри суши (озера, крупные реки);</li>
+<li>линейные объекты.</li>
+</ul>
+<h2>2. Предобработка снимков</h2>
+<p>Предобработка укладывается в несколько строчек кода в Google EarthEngine. Фильтрацию облачности оставимна откуп каналу QA, который содержит бинарные маски облачности. Функция  filterCloudSentinel2 анализирует этот канал и маскирует пиксель, если он был помечен облачным в QA. Далее происходит выбрка снимков по датам и географическому охвату.</p>
+<p>Для выбранных снимков производится маскирование облачности и рассчет медианы. Это позволяет по-быстрому избавиться от случайшных флуктуаций в данных получить более устойчивое к шумам изображение. И, наконец, строятся три индекса NDVI, NDWI1 и NDWI2. Первый индекс классический, предназначенный для анализа растительности, а второй и третий -- для анализа воды в листьях и грунте. Думаю, что добавление таких индексов в анализируемый стек каналов может увеличить точность работы (но это не точно )) -- проверим на следующем этапе).</p>
+<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">waterPoly</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">FeatureCollection</span><span class="p">(</span><span class="s2">&quot;users/.../waterPolyPrim&quot;</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">filterCloudSentinel2</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">img</span><span class="p">)</span> <span class="p">{</span>
+  <span class="cm">/*</span>
+<span class="cm">  Bitmask for QA60</span>
+
+<span class="cm">    Bit 10: Opaque clouds</span>
+<span class="cm">        0: No opaque clouds</span>
+<span class="cm">        1: Opaque clouds present</span>
+<span class="cm">    Bit 11: Cirrus clouds</span>
+<span class="cm">        0: No cirrus clouds</span>
+<span class="cm">        1: Cirrus clouds present</span>
+<span class="cm">  */</span>
+
+  <span class="kd">var</span> <span class="nx">quality</span> <span class="o">=</span> <span class="nx">img</span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s1">&#39;QA60&#39;</span><span class="p">).</span><span class="kr">int</span><span class="p">();</span>
+  <span class="kd">var</span> <span class="nx">cloudBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">1024</span><span class="p">);</span>    <span class="c1">// ee.Number(2).pow(10);</span>
+  <span class="kd">var</span> <span class="nx">cirrusBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">2048</span><span class="p">);</span>   <span class="c1">// ee.Number(2).pow(11);</span>
+
+  <span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cloudBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">cirrusFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">clear</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusFree</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="nx">img</span><span class="p">.</span><span class="nx">updateMask</span><span class="p">(</span><span class="nx">clear</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="kd">var</span> <span class="nx">collection</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">ImageCollection</span><span class="p">(</span><span class="nx">useCollection</span><span class="p">);</span>
+<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Filter</span><span class="p">.</span><span class="nx">date</span><span class="p">(</span><span class="s1">&#39;2019-04-25&#39;</span><span class="p">,</span> <span class="s1">&#39;2019-11-01&#39;</span><span class="p">));</span>
+<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filterBounds</span><span class="p">(</span><span class="nx">waterPoly</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">filterCloudSentinel2</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">median</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">median</span><span class="p">()</span>
+  <span class="p">.</span><span class="nx">expression</span><span class="p">(</span><span class="s1">&#39;b(&quot;B12&quot;,&quot;B11&quot;, &quot;B8A&quot;,&quot;B4&quot;,&quot;B3&quot;,&quot;B2&quot;)&#39;</span><span class="p">)</span>
+  <span class="p">.</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;swir2&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span><span class="s1">&#39;red&#39;</span><span class="p">,</span><span class="s1">&#39;green&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">NDWI1</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;swir1&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI1&#39;</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">NDWI2</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;nir&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI2&#39;</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">NDVI</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDVI&#39;</span><span class="p">);</span>
+</pre></div>
+
+
+<h1>Что получается</h1>
+<p>Ниже представлен пример снимка высокого разрешения на данную территорию (можно посмотреть его в полном разрешении):
+<img alt="Пример местности" src="images/2019-12-13/highRes.png" title="Пример местности на высоком разрешении" width="90%"></p>
+<p>На снимке хорошо видны реки, озера а также меандры в восточной части фрагмента.</p>
+<p>На следующем снимке на него наложены данные по водным объектам, полученные из OSM. Видно, что не все водные объекты на снимке покрыты (особенно это относится к меандрам Уссури), есть ошибки в позиционировании небольших рек (возможно, русло поменялось?).</p>
+<p><img alt="Пример местности" src="images/2019-12-13/highRes_osm.png" title="Пример местности на высоком разрешении" width="90%"></p>
+<p>Далее представлены снимки Sentinel-2 и рассчитанные индексы:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Снимок</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(swir1, nir, red)</td>
+<td><img alt="Пример местности" src="images/2019-12-13/RGB.png" title="RGB Sentinel-2" width="100%"></td>
+</tr>
+<tr>
+<td>NDVI</td>
+<td><img alt="Пример местности" src="images/2019-12-13/NDVI.png" title="NDVI" width="100%"></td>
+</tr>
+<tr>
+<td>NDWI1</td>
+<td><img alt="Пример местности" src="images/2019-12-13/NDWI1.png" title="NDWI1" width="100%"></td>
+</tr>
+<tr>
+<td>NDWI2</td>
+<td><img alt="Пример местности" src="images/2019-12-13/NDWI2.png" title="NDWI2" width="100%"></td>
+</tr>
+</tbody>
+</table>
+<p>Вода везде хорошо "вылезла" кроме NDWI1: видно, что в западной части фрагмента все пересвечено. Похоже, там очень влажные леса, которые дают такой эффект. Видно также, если посмотреть снимки в исходном рарзрешении, что Sentinel-2 может оказаться недостаточным, чтобы уверенно отбить мелкие реки и ручьи, хотя они и просматриваются на снимках. Но в целом видно, что вода должна неплохо отделяется от остальных объектво.</p>
+<h1>Что дальше</h1>
+<p>Следующий шаг -- сбор статистики и посроение первой версии классификатора. Далее будет видно по результатам.</p>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html" rel="bookmark"
+                           title="Permalink to Tigers on trails: occupancy modeling for cluster sampling">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2019-12-09T00:00:00+03:00">
                 Published: Пн 09 декабря 2019
@@ -27,134 +151,17 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи</strong>
-<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></p>
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи
+<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></strong></p>
 <h2>Суть задачи</h2>
 <p>Нужно создать методику оценки ареала вида по собранным следам присутствия. При этом ожидается, что данные по следам
 присутсвия животных:</p>
 <ul>
 <li>локально зависимы (более точно -- подчиняются Марковскому закону);</li>
-<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис между статистическим и практическими требваниями (обычно логистического плана).</li>
-</ul>
-<p>Предлагаемая методика использовалась для оценки ареала тигров в штате Карнатака (Индия).</p>
-<h2>Сбор данных</h2>
-<h3>Как делили территорию и собирали данные</h3>
-<p>Исследуемая территория занимает 22 тыс. кв. км. и расположена в штате Карнатака на юго-западе Индии. Поскольку известно, что тигры используют лесные дороги и помечают свою территорию, оставляя различные следы на дорогах, то поиск таких следов вдоль дорог занчительно повышает вероятность детекции тигра по сравнению со случайным поиском (построением случайных ячеек и их обследованием).</p>
-<p>Таким образом территория разбивалась на ячейки в 200 кв. километров (средний размер "домашней" территории тигра), внутри анализируемых ячеек случайным образом выбиралась точка, через которую прокладывался маршрут (с проходом по дорогам). Затем по маршруту проходили исследователи и искали следы присутсвия тигров. Каждый маршрут разбивался на участки длиной в один километр. </p>
-<p>На каждом сегменте отмечалось присутствие или отсуствие следов животных в виде бинарной величины.</p>
-<h2>Вычисления</h2>
-<p>Поскольку методика подразумевает анализ ареалов очень подвижных животных, которые могут передвигаться по дорогам иногда до нескольких километров, то вероятность встретить следы животного на следующем сегменте маршрута повышается, если следы были замечены на текущем сегменте. Таким образом в основе модели лежит идея использовать Марковские процессы и схему выборки с возвращением. Более конкретно:</p>
-<ul>
-<li>выбирается ячейка для анализа;</li>
-<li>начинается маршрут, состоящий из <span class="math">\(K\)</span> последовательных сегментов;</li>
-<li>записывается история встреч следов животного на маршруте (бинарная величина, есть следы или нет);</li>
-<li>по завершению маршрута получается бинарный вектор из <span class="math">\(K\)</span> нулей и единиц, например, для ячейки <span class="math">\(j\)</span>, состоящей из пяти сегментов, может быть получена следующая история: <span class="math">\(h_j = 01011\)</span>, означающая, что следы не были обнаружены на 1-м и 3-м сегменте маршрута.</li>
-</ul>
-<p>Как обычно, в модели учитываются вероятности того, что животное (его следы) может быть не обнаружено, хотя по факту оно присутствует.</p>
-<p>Вводятся обозначения:</p>
-<ul>
-<li><span class="math">\(p\)</span> - вероятность детекции следов на сегменте, при условии, что животное (следы) находилось в ячейке;</li>
-<li><span class="math">\(\psi\)</span> - вероятность того, что животное (следы) находилось в ячейке;</li>
-<li><span class="math">\(\theta\)</span> - вероятность того, что животное (следы) находилось на сегменте при условии, что ячейка занята животным и животное не посещало предыдущий сегмент;</li>
-<li><span class="math">\(\theta'\)</span> - вероятность того, что животное находилось на сегменте при условии, что ячейка была занята животным и следы животного были найдены на предыдущем сегменте.</li>
-</ul>
-<p>Эта схема позволяет задать Марковский процесс с ненаблюдаемой случайной переменной, означающей, было ли животное на предыдущем сегменте. Например, для следующей истории наблюдений <span class="math">\(h_j = 01011\)</span> данный процесс выражается следущей формулой:</p>
-<div class="math">$$
-Pr(h_j = 01011) = \underbrace{\psi}_{\text{тигр в ячейке}}
-       \underbrace{\Big[ \underbrace{(1-\theta)}_\text{тигра нет на сегм.}\theta + \underbrace{\theta(1-p)}_\text{тигр пропущен}\theta'\Big ]}_\text{I сегм.}
-       \underbrace{\underbrace{p}_\text{следы найдены}}_\text{II сегм.}
-       \underbrace{[(1-\theta ')\theta + \theta' (1-p)\theta']}_\text{III сегм.}
-       \underbrace{p}_\text{IV сегм.}
-       \underbrace{\theta' p}_\text{V сегм.}
-$$</div>
-<p>В этой формуле учитывается то, что если следов животных на сегменте не было обнаружено, то это может быть потому, что животного действительно там нет. Поэтому, рассматривая тот факт, что следы животного найдены на втором сегменте, мы не знаем, с какой именно вероятностью имеем дело (<span class="math">\(\theta\)</span> или <span class="math">\(\theta'\)</span>), следовательно вероятность не обнаружить следы в первом сегменте получаются в виде суммы произведения вероятностей.</p>
-<p>В случае, когда в ячейке не было обнаружено следов присуствия, также рассматривается две возможности -- отсуствие животного и его пропуск. Например, для маршрута состоящего из двух сегментов:</p>
-<div class="math">$$
-Pr(h_j = 00) = (1-\psi) + \psi\Big [\theta (1-p)(1-\theta' p) + (1-\theta)(1-\theta p) \Big].
-$$</div>
-<p>Таким образом вся история наблюдений описывается функцией правдоподобия:
-</p>
-<div class="math">$$
-L(\psi, \theta, \theta', p | h_1,h_2,\dots, h_s) = \prod_{j=1}^s Pr(h_j).
-$$</div>
-<p><em>Замечание 1.</em> Таким образом в модели подразумевается, что для всех ячеек и всех сегментов все вероятности равны между собой, т.е. <span class="math">\(p\)</span>, <span class="math">\(\theta\)</span> и <span class="math">\(\theta'\)</span> не зависят от местоположения.</p>
-<p>Реализация моделей производилась в программе PRESENCE [1].</p>
-<h2>Дальнейшие действия</h2>
-<p>Поскольку моя цель -- ознакомление с общими принципами, лежащими в основе моделей, то на этом этапе я останавливаюсь. Тем не менее следует сказать, что статья не заканчивается выводом модели. Далее авторы производят исследование методики на искусственно сгенерированных данных, изучают ошибки различных моделей. После исследования моделей авторы применяют модель к реальным данным -- поиску тигров.</p>
-<h1>Литература</h1>
-<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
-occupancy and related parameters. U.S. Geological Survey,
-Patuxent Wildlife Research Center, Laurel, Maryland, USA.
-hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
-<h1>Комментарии</h1>
-<p>Статья написана очень хорошо, дает достаточно полную картину, приводит логику вывода модели и сопровождает ее деталями. Видно, что авторы очень хорошо понимают, что делают и почему так, а не иначе. Очень рекомендую ее для введения в тематику.</p>
-<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
-    var align = "center",
-        indent = "0em",
-        linebreak = "false";
-
-    if (false) {
-        align = (screen.width < 768) ? "left" : align;
-        indent = (screen.width < 768) ? "0em" : indent;
-        linebreak = (screen.width < 768) ? 'true' : linebreak;
-    }
-
-    var mathjaxscript = document.createElement('script');
-    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
-    mathjaxscript.type = 'text/javascript';
-    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
-
-    var configscript = document.createElement('script');
-    configscript.type = 'text/x-mathjax-config';
-    configscript[(window.opera ? "innerHTML" : "text")] =
-        "MathJax.Hub.Config({" +
-        "    config: ['MMLorHTML.js']," +
-        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
-        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
-        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
-        "    displayAlign: '"+ align +"'," +
-        "    displayIndent: '"+ indent +"'," +
-        "    showMathMenu: true," +
-        "    messageStyle: 'normal'," +
-        "    tex2jax: { " +
-        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
-        "        displayMath: [ ['$$','$$'] ]," +
-        "        processEscapes: true," +
-        "        preview: 'TeX'," +
-        "    }, " +
-        "    'HTML-CSS': { " +
-        "        availableFonts: ['STIX', 'TeX']," +
-        "        preferredFont: 'STIX'," +
-        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
-        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
-        "    }, " +
-        "}); " +
-        "if ('default' !== 'default') {" +
-            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-        "}";
-
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
-}
-</script>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис …</li></ul>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
