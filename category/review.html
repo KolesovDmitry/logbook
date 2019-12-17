@@ -17,78 +17,289 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">Development of a global ~90 m water body map using multi-temporal Landsat images</a></h1>
 <footer class="post-info">
-        <abbr class="published" title="2019-12-09T00:00:00+03:00">
-                Published: Пн 09 декабря 2019
+        <abbr class="published" title="2019-12-16T00:00:00+03:00">
+                Published: Пн 16 декабря 2019
         </abbr>
 
         <address class="vcard author">
                 By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи
-<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></strong></p>
-<h2>Суть задачи</h2>
-<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. При этом ожидается, что данные по следам
-присутсвия животных:</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> <a href="https://kolesovdmitry.github.io/logbook/tag/landsat.html">Landsat</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор статьи
+<a href="https://www.sciencedirect.com/science/article/abs/pii/S0034425715301656">Development of a global ~90 m water body map using multi-temporal Landsat images</a></strong></p>
+<h2>Суть дела</h2>
+<p>Статья описывает то, как создавался продукт <a href="http://hydro.iis.u-tokyo.ac.jp/~yamadai/G3WBM/">Global 3 arc-second Water Body Map (G3WBM)</a>.
+Этот продукт представляет собой маски постоянных и временных водных объектов, построенных на временных сериях Ландстатов (более точно -- на четырех эпохах
+<a href="https://www.usgs.gov/land-resources/nli/landsat/global-land-survey-gls?qt-science_support_page_related_con=0#qt-science_support_page_related_con">Global Land Survey</a>).</p>
+<p>Маска включает следующие типы объектов:</p>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th>Содержание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Land</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Land (No Landsat observation)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Snow</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Wet Soil / Wet Vegetation / Lava</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Salt Marsh</td>
+</tr>
+<tr>
+<td>40</td>
+<td>Temporal Flooded Area</td>
+</tr>
+<tr>
+<td>50</td>
+<td>Permanent Water</td>
+</tr>
+<tr>
+<td>51</td>
+<td>Permanent Water (Added by SWBD)</td>
+</tr>
+<tr>
+<td>99</td>
+<td>Ocean (Given by external land/sea mask)</td>
+</tr>
+</tbody>
+</table>
+<h2>Модель</h2>
+<h3>Данные</h3>
+<p>В работе используются данные GLCF Landsat Global Land Survey [1] -- это подекадные мозаики данных Ландсат (разных поколений), очищенных от
+облачности и прошедших ортокоррекцию. Авторы использовали данные TM и ETM следующих периодов: 1990, 2000, 2005 и 2010.</p>
+<p>Используемые при расчетах каналы:</p>
 <ul>
-<li>локально зависимы (более точно -- подчиняются Марковскому закону);</li>
-<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис между статистическим и практическими требваниями (обычно логистического плана).</li>
+<li>зеленый, Green (второй);</li>
+<li>красный, Red (третий);</li>
+<li>ближний инфракрасный, NIR (четвертый);</li>
+<li>коротковолновый инфракрасный, SWIR (пятый);</li>
+<li>тепловой инфракрасный, TIR (шестой).</li>
 </ul>
-<p>Предлагаемая методика использовалась для оценки ареала тигров в штате Карнатака (Индия).</p>
-<h2>Сбор данных</h2>
-<h3>Как делили территорию и собирали данные</h3>
-<p>Исследуемая территория занимает 22 тыс. кв. км. и расположена в штате Карнатака на юго-западе Индии. Поскольку известно, что тигры используют лесные дороги и помечают свою территорию, оставляя различные следы на дорогах, то поиск таких следов вдоль дорог занчительно повышает вероятность детекции тигра по сравнению со случайным поиском (построением случайных ячеек и их обследованием).</p>
-<p>Таким образом территория разбивалась на ячейки в 200 кв. километров (средний размер "домашней" территории тигра), внутри анализируемых ячеек случайным образом выбиралась точка, через которую прокладывался маршрут (с проходом по дорогам). Затем по маршруту проходили исследователи и искали следы присутсвия тигров. Каждый маршрут разбивался на участки длиной в один километр. </p>
-<p>На каждом сегменте отмечалось присутствие или отсуствие следов животных в виде бинарной величины.</p>
-<h2>Вычисления</h2>
-<p>Поскольку методика подразумевает анализ ареалов очень подвижных животных, которые могут передвигаться по дорогам иногда до нескольких километров, то вероятность встретить следы животного на следующем сегменте маршрута повышается, если следы были замечены на текущем сегменте. Таким образом в основе модели лежит идея использовать Марковские процессы и схему выборки с возвращением. Более конкретно:</p>
+<p>Помимо Ландсатов использовались данные по рельефу (главным образом SRTM, а для высоких широт и другие источники) и маски водных
+объектов (в основном, океаны), полученные по радарным данным.</p>
+<h3>Методы</h3>
+<h4>Предварительная обработка Ландсатов</h4>
+<ol>
+<li>Взяли данные GLS.</li>
+<li>Рассчитали отражательную способность и температуру для выбранных каналов <span class="math">\(\rho_B\)</span>, <span class="math">\(\rho_G\)</span>, <span class="math">\(\rho_R\)</span>, <span class="math">\(\rho_{NIR}\)</span>, <span class="math">\(\rho_{SWIR}\)</span> и <span class="math">\(T_b\)</span> (в градусах Цельсия).</li>
+<li>Рассчитали разностные индексы:
+<div class="math">$$
+NDWI = \frac{\rho_g - \rho_{SWIR}}{\rho_g + \rho_{SWIR}}
+$$</div>
+</li>
+</ol>
+<div class="math">$$
+NDVI = \frac{\rho_{NIR} - \rho_{R}}{\rho_{NIR} + \rho_{R}}
+$$</div>
+<p>В предобработку также входит залитие "дырок" в сломанном седьмом Ландсате, которые закрыли интерполяцией (в статье описано, как именно, но нам это не суть важно).</p>
+<h4>Частота детекции воды</h4>
+<p>Вводится понятие частоты детекции воды ("water frequency"). Оно рассчитывется для каждого пикселя отдельно по следующей формуле:</p>
+<div class="math">$$
+F_{w_i} = \frac{\sum_{j=1}^{N}( O_{i,j} W_{i,j} )}{\sum_{j=1}^N O_{i,j}},
+$$</div>
+<p>где <span class="math">\(O_{i,j}\)</span> -- надежность наблюдения в пикселе <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span>,
+<span class="math">\(W_{i,j}\)</span> -- вероятность того, что в пикселе  <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span> находится водный объект,
+<span class="math">\(N\)</span> -- число сцен Ландсат, доступных для пикселя <span class="math">\(i\)</span>.</p>
+<p>Расшифровка обозначений, применяемых в данной формуле и величин, через которые они определяются, приведены в таблице:</p>
+<table>
+<thead>
+<tr>
+<th>Обозначение</th>
+<th>Формула</th>
+<th>Краткое описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math">\(O_{i,j}\)</span></td>
+<td>
+<div class="math">$$O_{i,j} =  \max[1- P_{c_i}, 0.001]$$</div>
+</td>
+<td>надежность наблюдения в пикселе <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span></td>
+</tr>
+<tr>
+<td><span class="math">\(P_{c_i}\)</span></td>
+<td>
+<div class="math">$$P_{c_i} = \frac{\min[\rho_{grn}, 0.25]}{0.25}f_{NDLI}F_{T_b}$$</div>
+</td>
+<td>вероятностный показатель того, что в пикселе <span class="math">\(i\)</span>  сцены <span class="math">\(j\)</span> расположено облако или снег; лежит в диапазоне от 0 (гарантировано не облако и не снег) до 1 (гарантировано облако/снег)</td>
+</tr>
+<tr>
+<td><span class="math">\(\rho_{grn}\)</span></td>
+<td>
+<div class="math">$$ \rho_{grn} = \min[\rho_G, \rho_R, \rho_{NIR}]$$</div>
+</td>
+<td>минимум отражательной способности в зеленом, красном и инфракрасном каналах</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{NDLI}\)</span></td>
+<td>
+<div class="math">$$f_{NDLI} =\begin{cases} 1, \qquad (NDLI &lt; 0)\\ 1-2\times NDLI, \qquad (0\leq NDLI \leq 0.5) \\ 0, \qquad (0.5 \leq NDLI )  \end{cases} $$</div>
+</td>
+<td>корректирующий множитель на базе индекса NDLI</td>
+</tr>
+<tr>
+<td><span class="math">\(NDLI\)</span></td>
+<td>
+<div class="math">$$\frac{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}$$</div>
+</td>
+<td>NDLI (Normalized Difference Land Index)</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{T_b}\)</span></td>
+<td>Если (NDWI &lt; 0.3): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0.25 )\\ 0.2\times(30-T_b), \qquad (25\leq T_b &lt; 30) \\ 0, \qquad 30 &lt; T_b )  \end{cases};$$</div>  Если (<span class="math">\(NDWI \geq 0.3\)</span>): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0 )\\ 0.2\times(5-T_b), \qquad (0 \leq T_b &lt; 5) \\ 0, \qquad 5 &lt; T_b )  \end{cases}$$</div>
+</td>
+<td>корректирующий множитель на базе теплового канала</td>
+</tr>
+<tr>
+<td><span class="math">\(W_{i,j}\)</span></td>
+<td>
+<div class="math">$$W_{i,j} = P_{NDWI}  f_{NDVI}$$</div>
+</td>
+<td>вероятность того, что в пикселе  <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span> находится водный объект</td>
+</tr>
+<tr>
+<td><span class="math">\(P_{NDWI}\)</span></td>
+<td>
+<div class="math">$$P_{NDWI} =  \begin{cases} 0, \qquad (NDWI &lt; 0 )\\ NDWI/0.3, \qquad (0\leq NDWI &lt; 0.3) \\ 1, \qquad 0.3 &lt; NDWI )  \end{cases};$$</div>
+</td>
+<td>вероятностный показатель, использующий NDWI</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{NDVI}\)</span></td>
+<td>
+<div class="math">$$f_{NDDI} =\begin{cases} 1, \qquad (NDVI &lt; 0.1)\\ 10\times (0.2 - NDVI), \qquad (0.1\leq NDVI \leq 0.2) \\ 0, \qquad (0.2 \leq NDVI )  \end{cases} $$</div>
+</td>
+<td>корректирующий фактор, использующий NDVI</td>
+</tr>
+</tbody>
+</table>
+<p>В статье коротко описывается логика того, почему введен тот или иной корректирующий фактор, но я опускаю эти рассуждения.</p>
+<h4>Усреднение индексов по сценам</h4>
+<p>Помимо частоты <span class="math">\(F_{w_i}\)</span> в расчтетах используется усредненный индекс для отражательных способностей и вегетационных индексов. Этот параметр используется на шаге классификации водных объектов и задается следующей формулой:</p>
+<div class="math">$$
+\overline{V}_i = \frac{\sum_{j=1}^N (O_{i,j}W_{i,j}V_{i,j})}{\sum_{j=1}^N (O_{i,j}W_{i,j})},
+$$</div>
+<p>
+где <span class="math">\(\overline{V}_i\)</span> -- усредненный индекс в пикселе <span class="math">\(i\)</span>,  <span class="math">\(O_{i,j}\)</span> --надежность наблюдения в данном пикселе,  <span class="math">\(W_{i,j}\)</span> -- вероятность того, что в пикселе <span class="math">\(i\)</span> сцены <span class="math">\(j\)</span> находится водный объект, <span class="math">\(V_{i,j}\)</span> -- целевой индекс (т.е. отражательная способнобность для выбранных каналов <span class="math">\(\rho_B\)</span>, <span class="math">\(\rho_G\)</span>, <span class="math">\(\rho_R\)</span>, <span class="math">\(\rho_{NIR}\)</span>, <span class="math">\(\rho_{SWIR}\)</span>, температура <span class="math">\(T_b\)</span>, индексы NDWI, NDVI и <span class="math">\(\rho_{grn}\)</span>), <span class="math">\(N\)</span> -- число сцен для пикселя <span class="math">\(i\)</span>.</p>
+<h3>Классификация</h3>
+<p><img alt="Классификация" src="images/2019-12-16/Fig1.png" title="Общая схема классификации" width="90%"></p>
+<p>Основная задача классификации -- отделить объекты, похожие на воду (лед, снег, влажные почвы, и т.д.), общая схема классификации показана на рисунке.</p>
+<h4>Пиксели с большими значениями NDWI</h4>
+<p>Часто большие значения NDWI оказываются у объектов, которые на самом деле не являются водой. Поэтому, чтобы отделить воду от таких объектов, предварительно проверяется ряд условий, перечисленных в таблице:</p>
+<table>
+<thead>
+<tr>
+<th>Критерий</th>
+<th>Лед, снег</th>
+<th>Солончаки</th>
+<th>Влажная почва / растительность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Критерий группировки</td>
+<td><span class="math">\(f_{w_i} &gt; 0.3\)</span></td>
+<td><span class="math">\(f_{w_i} &gt; 0.1\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &lt; 0.15\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &gt; 0.15\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &gt; 0.25\)</span></td>
+<td><span class="math">\(0.0 &lt; \overline{WI}_i &lt; 0.5\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{T_b}_{i} &lt;0.2\)</span></td>
+<td><span class="math">\(\overline{T_b}_{i} &gt; 0\)</span></td>
+<td><span class="math">\(-0.15 &lt; \overline{VI}_i &lt; 0.3\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{WI}_{i} &gt; 0.4\)</span></td>
+<td><span class="math">\(\overline{WI}_{i} &gt; 0.4\)</span></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{VI}_{i} &gt; -0.2\)</span></td>
+<td><span class="math">\(\overline{VI}_{i} &gt; -0.2\)</span></td>
+<td></td>
+</tr>
+<tr>
+<td>---------------------</td>
+<td>-----------------------------------</td>
+<td>----------------------------------</td>
+<td>---------------------------------</td>
+</tr>
+<tr>
+<td>Решающий критерий</td>
+<td><span class="math">\(\overline{\rho}_{grn}^g &gt; 0.2\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn}^g &gt; 0.2\)</span></td>
+<td><span class="math">\( \overline{WI}^g &lt; 0.5\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{Tb}^{g} &lt;0\)</span></td>
+<td></td>
+<td><span class="math">\(\overline{VI}^g &lt; 0.05\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{WI}^{g} &gt;0.6\)</span></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{VI}^{g} &gt;0.2\)</span></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>(Авторы пишут, что пороги, представленные в таблице получены опытным путем.)</p>
+<p>В таблице описаны два класса критериев:</p>
 <ul>
-<li>выбирается ячейка для анализа;</li>
-<li>начинается маршрут, состоящий из <span class="math">\(K\)</span> последовательных сегментов;</li>
-<li>записывается история встреч следов животного на маршруте (бинарная величина, есть следы или нет);</li>
-<li>по завершению маршрута получается бинарный вектор из <span class="math">\(K\)</span> нулей и единиц, например, для ячейки <span class="math">\(j\)</span>, состоящей из пяти сегментов, может быть получена следующая история: <span class="math">\(h_j = 01011\)</span>, означающая, что следы не были обнаружены на 1-м и 3-м сегменте маршрута.</li>
+<li>критерий группировки, он отвечает за то, чтобы объединить близлижайшие пиксели в одну "лепешку" (группу); это позволяет избежать излишнего мельчения участков, т.е. пиксели,
+  лежащие в одной группе будут отнесены к общему классу; для всех пикслей группы расчитывается групповой индекс, полученный на базе усредненного по сценам индекса (<span class="math">\(\overline{V}^g = \frac{\sum_{i=1}^M \overline{V}_i}{M}\)</span>, где <span class="math">\(M\)</span> -- число пикселей в группе).</li>
+<li>решающий критерий отвечает за то, к какому классу следует отнести выделенную группу.</li>
 </ul>
-<p>Как обычно, в модели учитываются вероятности того, что животное (его следы) может быть не обнаружено, хотя по факту оно присутствует.</p>
-<p>Вводятся обозначения:</p>
+<p>Таким образом работа происходит в несколько этапов: выделение групп, затем рассчет групповых индексов и принятие решения о том, следует ли отнести группу к тому или иному классу или же передать эти пиксели на дальнейшую обработку.</p>
+<h4>Выделение водных поверхностей</h4>
+<p>После исключения из анализа льда, солончаков и влажных почв оставшиеся пиксели классифицируются как "временно заливаемые территории", "постоянные водные объекты" и "суша". На этом этапе наибольшую
+трудность представляют тени, которые по своим свойствам перемешиваются с водной поверхностью =&gt; жизнь облегчит использование ЦМР, которая позволяет отфильтровать тени на склонах. Поэтому:</p>
 <ul>
-<li><span class="math">\(p\)</span> - вероятность детекции следов на сегменте, при условии, что животное (следы) находилось в ячейке;</li>
-<li><span class="math">\(\psi\)</span> - вероятность того, что животное (следы) находилось в ячейке;</li>
-<li><span class="math">\(\theta\)</span> - вероятность того, что животное (следы) находилось на сегменте при условии, что ячейка занята животным и животное не посещало предыдущий сегмент;</li>
-<li><span class="math">\(\theta'\)</span> - вероятность того, что животное находилось на сегменте при условии, что ячейка была занята животным и следы животного были найдены на предыдущем сегменте.</li>
+<li>группируются пиксели, для которых <span class="math">\(f_{w_i} &gt; 0.7\)</span>, если для более чем половины из них перепад высот составляет менее 5 метров на пиксель (у авторов пиксель 90 метров), то эта группа считается постоянным водным объектом, в противном случае -- тенью;</li>
+<li>группируются пиксели, для которых <span class="math">\(0.1 \leq f_{w_i} \leq 0.7\)</span>, эта группа считается временно заливаемой территорией, если для нее групповой NDWI не менее 0.5 и перепад высот для половины пикселей группы не выше 5 метров на пиксель.</li>
 </ul>
-<p>Эта схема позволяет задать Марковский процесс с ненаблюдаемой случайной переменной, означающей, было ли животное на предыдущем сегменте. Например, для следующей истории наблюдений <span class="math">\(h_j = 01011\)</span> данный процесс выражается следущей формулой:</p>
-<div class="math">$$
-Pr(h_j = 01011) = \underbrace{\psi}_{\text{тигр в ячейке}}
-       \underbrace{\Big[ \underbrace{(1-\theta)}_\text{тигра нет на сегм.}\theta + \underbrace{\theta(1-p)}_\text{тигр пропущен}\theta'\Big ]}_\text{I сегм.}
-       \underbrace{\underbrace{p}_\text{следы найдены}}_\text{II сегм.}
-       \underbrace{[(1-\theta ')\theta + \theta' (1-p)\theta']}_\text{III сегм.}
-       \underbrace{p}_\text{IV сегм.}
-       \underbrace{\theta' p}_\text{V сегм.}
-$$</div>
-<p>В этой формуле учитывается то, что если следов животных на сегменте не было обнаружено, то это может быть потому, что животного действительно там нет. Поэтому, рассматривая тот факт, что следы животного найдены на втором сегменте, мы не знаем, с какой именно вероятностью имеем дело (<span class="math">\(\theta\)</span> или <span class="math">\(\theta'\)</span>), следовательно вероятность не обнаружить следы в первом сегменте получаются в виде суммы произведения вероятностей.</p>
-<p>В случае, когда в ячейке не было обнаружено следов присуствия, также рассматривается две возможности -- отсуствие животного и его пропуск. Например, для маршрута состоящего из двух сегментов:</p>
-<div class="math">$$
-Pr(h_j = 00) = (1-\psi) + \psi\Big [\theta (1-p)(1-\theta' p) + (1-\theta)(1-\theta p) \Big].
-$$</div>
-<p>Таким образом вся история наблюдений описывается функцией правдоподобия:
-</p>
-<div class="math">$$
-L(\psi, \theta, \theta', p | h_1,h_2,\dots, h_s) = \prod_{j=1}^s Pr(h_j).
-$$</div>
-<p><em>Замечание 1.</em> Таким образом в модели подразумевается, что для всех ячеек и всех сегментов все вероятности равны между собой, т.е. <span class="math">\(p\)</span>, <span class="math">\(\theta\)</span> и <span class="math">\(\theta'\)</span> не зависят от местоположения.</p>
-<p>Реализация моделей производилась в программе PRESENCE [1].</p>
-<h2>Дальнейшие действия</h2>
-<p>Поскольку моя цель -- ознакомление с общими принципами, лежащими в основе моделей, то на этом этапе я останавливаюсь. Тем не менее следует сказать, что статья не заканчивается выводом модели. Далее авторы производят исследование методики на искусственно сгенерированных данных, изучают ошибки различных моделей. После исследования моделей авторы применяют модель к реальным данным -- поиску тигров.</p>
+<p>Все оставшиеся пиксели считаются сушей.</p>
+<h2>Замечания</h2>
+<p>Изначальная статья разрабатывалась на долговременных рядах данных (пара десятков лет), подход будет работать плохо для изменяющихся во времени русел (и авторы подключают дополнительные источники на этот случай). Но нас это не слишком пугает -- у нас глубин анализа два-три года.</p>
+<p>Авторы подбирали параметры и пороги итеративно визуальным контролем. Вполне возможно, что на нашу территорию нужно будет использовать другие значения параметров.</p>
 <h1>Литература</h1>
-<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
-occupancy and related parameters. U.S. Geological Survey,
-Patuxent Wildlife Research Center, Laurel, Maryland, USA.
-hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
-<h1>Комментарии</h1>
-<p>Статья написана очень хорошо, дает достаточно полную картину, приводит логику вывода модели и сопровождает ее деталями. Видно, что авторы очень хорошо понимают, что делают и почему так, а не иначе. Очень рекомендую ее для введения в тематику.</p>
+<p>[1] Gutman, G., Huang, C., Chander, G., Noojipady, P., &amp; Masek, J. G. (2013). Assessment of the
+NASA-USGS Global Land Survey (GLS) datasets. Remote Sensing of Environment, 134,
+249–265. http://dx.doi.org/10.1016/j.rse.2013.02.026.</p>
 <script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
@@ -156,6 +367,35 @@ hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
                     <h1>Other articles</h1>
                     <hr />
                     <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html" rel="bookmark"
+                           title="Permalink to Tigers on trails: occupancy modeling for cluster sampling">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2019-12-09T00:00:00+03:00">
+                Published: Пн 09 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи
+<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></strong></p>
+<h2>Суть задачи</h2>
+<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. При этом ожидается, что данные по следам
+присутсвия животных:</p>
+<ul>
+<li>локально зависимы (более точно -- подчиняются Марковскому закону);</li>
+<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис …</li></ul>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>

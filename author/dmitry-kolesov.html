@@ -17,7 +17,364 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">Development of a global ~90 m water body map using multi-temporal Landsat images</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2019-12-16T00:00:00+03:00">
+                Published: Пн 16 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> <a href="https://kolesovdmitry.github.io/logbook/tag/landsat.html">Landsat</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор статьи
+<a href="https://www.sciencedirect.com/science/article/abs/pii/S0034425715301656">Development of a global ~90 m water body map using multi-temporal Landsat images</a></strong></p>
+<h2>Суть дела</h2>
+<p>Статья описывает то, как создавался продукт <a href="http://hydro.iis.u-tokyo.ac.jp/~yamadai/G3WBM/">Global 3 arc-second Water Body Map (G3WBM)</a>.
+Этот продукт представляет собой маски постоянных и временных водных объектов, построенных на временных сериях Ландстатов (более точно -- на четырех эпохах
+<a href="https://www.usgs.gov/land-resources/nli/landsat/global-land-survey-gls?qt-science_support_page_related_con=0#qt-science_support_page_related_con">Global Land Survey</a>).</p>
+<p>Маска включает следующие типы объектов:</p>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th>Содержание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Land</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Land (No Landsat observation)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Snow</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Wet Soil / Wet Vegetation / Lava</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Salt Marsh</td>
+</tr>
+<tr>
+<td>40</td>
+<td>Temporal Flooded Area</td>
+</tr>
+<tr>
+<td>50</td>
+<td>Permanent Water</td>
+</tr>
+<tr>
+<td>51</td>
+<td>Permanent Water (Added by SWBD)</td>
+</tr>
+<tr>
+<td>99</td>
+<td>Ocean (Given by external land/sea mask)</td>
+</tr>
+</tbody>
+</table>
+<h2>Модель</h2>
+<h3>Данные</h3>
+<p>В работе используются данные GLCF Landsat Global Land Survey [1] -- это подекадные мозаики данных Ландсат (разных поколений), очищенных от
+облачности и прошедших ортокоррекцию. Авторы использовали данные TM и ETM следующих периодов: 1990, 2000, 2005 и 2010.</p>
+<p>Используемые при расчетах каналы:</p>
+<ul>
+<li>зеленый, Green (второй);</li>
+<li>красный, Red (третий);</li>
+<li>ближний инфракрасный, NIR (четвертый);</li>
+<li>коротковолновый инфракрасный, SWIR (пятый);</li>
+<li>тепловой инфракрасный, TIR (шестой).</li>
+</ul>
+<p>Помимо Ландсатов использовались данные по рельефу (главным образом SRTM, а для высоких широт и другие источники) и маски водных
+объектов (в основном, океаны), полученные по радарным данным.</p>
+<h3>Методы</h3>
+<h4>Предварительная обработка Ландсатов</h4>
+<ol>
+<li>Взяли данные GLS.</li>
+<li>Рассчитали отражательную способность и температуру для выбранных каналов <span class="math">\(\rho_B\)</span>, <span class="math">\(\rho_G\)</span>, <span class="math">\(\rho_R\)</span>, <span class="math">\(\rho_{NIR}\)</span>, <span class="math">\(\rho_{SWIR}\)</span> и <span class="math">\(T_b\)</span> (в градусах Цельсия).</li>
+<li>Рассчитали разностные индексы:
+<div class="math">$$
+NDWI = \frac{\rho_g - \rho_{SWIR}}{\rho_g + \rho_{SWIR}}
+$$</div>
+</li>
+</ol>
+<div class="math">$$
+NDVI = \frac{\rho_{NIR} - \rho_{R}}{\rho_{NIR} + \rho_{R}}
+$$</div>
+<p>В предобработку также входит залитие "дырок" в сломанном седьмом Ландсате, которые закрыли интерполяцией (в статье описано, как именно, но нам это не суть важно).</p>
+<h4>Частота детекции воды</h4>
+<p>Вводится понятие частоты детекции воды ("water frequency"). Оно рассчитывется для каждого пикселя отдельно по следующей формуле:</p>
+<div class="math">$$
+F_{w_i} = \frac{\sum_{j=1}^{N}( O_{i,j} W_{i,j} )}{\sum_{j=1}^N O_{i,j}},
+$$</div>
+<p>где <span class="math">\(O_{i,j}\)</span> -- надежность наблюдения в пикселе <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span>,
+<span class="math">\(W_{i,j}\)</span> -- вероятность того, что в пикселе  <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span> находится водный объект,
+<span class="math">\(N\)</span> -- число сцен Ландсат, доступных для пикселя <span class="math">\(i\)</span>.</p>
+<p>Расшифровка обозначений, применяемых в данной формуле и величин, через которые они определяются, приведены в таблице:</p>
+<table>
+<thead>
+<tr>
+<th>Обозначение</th>
+<th>Формула</th>
+<th>Краткое описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math">\(O_{i,j}\)</span></td>
+<td>
+<div class="math">$$O_{i,j} =  \max[1- P_{c_i}, 0.001]$$</div>
+</td>
+<td>надежность наблюдения в пикселе <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span></td>
+</tr>
+<tr>
+<td><span class="math">\(P_{c_i}\)</span></td>
+<td>
+<div class="math">$$P_{c_i} = \frac{\min[\rho_{grn}, 0.25]}{0.25}f_{NDLI}F_{T_b}$$</div>
+</td>
+<td>вероятностный показатель того, что в пикселе <span class="math">\(i\)</span>  сцены <span class="math">\(j\)</span> расположено облако или снег; лежит в диапазоне от 0 (гарантировано не облако и не снег) до 1 (гарантировано облако/снег)</td>
+</tr>
+<tr>
+<td><span class="math">\(\rho_{grn}\)</span></td>
+<td>
+<div class="math">$$ \rho_{grn} = \min[\rho_G, \rho_R, \rho_{NIR}]$$</div>
+</td>
+<td>минимум отражательной способности в зеленом, красном и инфракрасном каналах</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{NDLI}\)</span></td>
+<td>
+<div class="math">$$f_{NDLI} =\begin{cases} 1, \qquad (NDLI &lt; 0)\\ 1-2\times NDLI, \qquad (0\leq NDLI \leq 0.5) \\ 0, \qquad (0.5 \leq NDLI )  \end{cases} $$</div>
+</td>
+<td>корректирующий множитель на базе индекса NDLI</td>
+</tr>
+<tr>
+<td><span class="math">\(NDLI\)</span></td>
+<td>
+<div class="math">$$\frac{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}$$</div>
+</td>
+<td>NDLI (Normalized Difference Land Index)</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{T_b}\)</span></td>
+<td>Если (NDWI &lt; 0.3): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0.25 )\\ 0.2\times(30-T_b), \qquad (25\leq T_b &lt; 30) \\ 0, \qquad 30 &lt; T_b )  \end{cases};$$</div>  Если (<span class="math">\(NDWI \geq 0.3\)</span>): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0 )\\ 0.2\times(5-T_b), \qquad (0 \leq T_b &lt; 5) \\ 0, \qquad 5 &lt; T_b )  \end{cases}$$</div>
+</td>
+<td>корректирующий множитель на базе теплового канала</td>
+</tr>
+<tr>
+<td><span class="math">\(W_{i,j}\)</span></td>
+<td>
+<div class="math">$$W_{i,j} = P_{NDWI}  f_{NDVI}$$</div>
+</td>
+<td>вероятность того, что в пикселе  <span class="math">\(i\)</span> для сцены <span class="math">\(j\)</span> находится водный объект</td>
+</tr>
+<tr>
+<td><span class="math">\(P_{NDWI}\)</span></td>
+<td>
+<div class="math">$$P_{NDWI} =  \begin{cases} 0, \qquad (NDWI &lt; 0 )\\ NDWI/0.3, \qquad (0\leq NDWI &lt; 0.3) \\ 1, \qquad 0.3 &lt; NDWI )  \end{cases};$$</div>
+</td>
+<td>вероятностный показатель, использующий NDWI</td>
+</tr>
+<tr>
+<td><span class="math">\(f_{NDVI}\)</span></td>
+<td>
+<div class="math">$$f_{NDDI} =\begin{cases} 1, \qquad (NDVI &lt; 0.1)\\ 10\times (0.2 - NDVI), \qquad (0.1\leq NDVI \leq 0.2) \\ 0, \qquad (0.2 \leq NDVI )  \end{cases} $$</div>
+</td>
+<td>корректирующий фактор, использующий NDVI</td>
+</tr>
+</tbody>
+</table>
+<p>В статье коротко описывается логика того, почему введен тот или иной корректирующий фактор, но я опускаю эти рассуждения.</p>
+<h4>Усреднение индексов по сценам</h4>
+<p>Помимо частоты <span class="math">\(F_{w_i}\)</span> в расчтетах используется усредненный индекс для отражательных способностей и вегетационных индексов. Этот параметр используется на шаге классификации водных объектов и задается следующей формулой:</p>
+<div class="math">$$
+\overline{V}_i = \frac{\sum_{j=1}^N (O_{i,j}W_{i,j}V_{i,j})}{\sum_{j=1}^N (O_{i,j}W_{i,j})},
+$$</div>
+<p>
+где <span class="math">\(\overline{V}_i\)</span> -- усредненный индекс в пикселе <span class="math">\(i\)</span>,  <span class="math">\(O_{i,j}\)</span> --надежность наблюдения в данном пикселе,  <span class="math">\(W_{i,j}\)</span> -- вероятность того, что в пикселе <span class="math">\(i\)</span> сцены <span class="math">\(j\)</span> находится водный объект, <span class="math">\(V_{i,j}\)</span> -- целевой индекс (т.е. отражательная способнобность для выбранных каналов <span class="math">\(\rho_B\)</span>, <span class="math">\(\rho_G\)</span>, <span class="math">\(\rho_R\)</span>, <span class="math">\(\rho_{NIR}\)</span>, <span class="math">\(\rho_{SWIR}\)</span>, температура <span class="math">\(T_b\)</span>, индексы NDWI, NDVI и <span class="math">\(\rho_{grn}\)</span>), <span class="math">\(N\)</span> -- число сцен для пикселя <span class="math">\(i\)</span>.</p>
+<h3>Классификация</h3>
+<p><img alt="Классификация" src="images/2019-12-16/Fig1.png" title="Общая схема классификации" width="90%"></p>
+<p>Основная задача классификации -- отделить объекты, похожие на воду (лед, снег, влажные почвы, и т.д.), общая схема классификации показана на рисунке.</p>
+<h4>Пиксели с большими значениями NDWI</h4>
+<p>Часто большие значения NDWI оказываются у объектов, которые на самом деле не являются водой. Поэтому, чтобы отделить воду от таких объектов, предварительно проверяется ряд условий, перечисленных в таблице:</p>
+<table>
+<thead>
+<tr>
+<th>Критерий</th>
+<th>Лед, снег</th>
+<th>Солончаки</th>
+<th>Влажная почва / растительность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Критерий группировки</td>
+<td><span class="math">\(f_{w_i} &gt; 0.3\)</span></td>
+<td><span class="math">\(f_{w_i} &gt; 0.1\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &lt; 0.15\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &gt; 0.15\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn_i} &gt; 0.25\)</span></td>
+<td><span class="math">\(0.0 &lt; \overline{WI}_i &lt; 0.5\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{T_b}_{i} &lt;0.2\)</span></td>
+<td><span class="math">\(\overline{T_b}_{i} &gt; 0\)</span></td>
+<td><span class="math">\(-0.15 &lt; \overline{VI}_i &lt; 0.3\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{WI}_{i} &gt; 0.4\)</span></td>
+<td><span class="math">\(\overline{WI}_{i} &gt; 0.4\)</span></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{VI}_{i} &gt; -0.2\)</span></td>
+<td><span class="math">\(\overline{VI}_{i} &gt; -0.2\)</span></td>
+<td></td>
+</tr>
+<tr>
+<td>---------------------</td>
+<td>-----------------------------------</td>
+<td>----------------------------------</td>
+<td>---------------------------------</td>
+</tr>
+<tr>
+<td>Решающий критерий</td>
+<td><span class="math">\(\overline{\rho}_{grn}^g &gt; 0.2\)</span></td>
+<td><span class="math">\(\overline{\rho}_{grn}^g &gt; 0.2\)</span></td>
+<td><span class="math">\( \overline{WI}^g &lt; 0.5\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{Tb}^{g} &lt;0\)</span></td>
+<td></td>
+<td><span class="math">\(\overline{VI}^g &lt; 0.05\)</span></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{WI}^{g} &gt;0.6\)</span></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><span class="math">\(\overline{VI}^{g} &gt;0.2\)</span></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>(Авторы пишут, что пороги, представленные в таблице получены опытным путем.)</p>
+<p>В таблице описаны два класса критериев:</p>
+<ul>
+<li>критерий группировки, он отвечает за то, чтобы объединить близлижайшие пиксели в одну "лепешку" (группу); это позволяет избежать излишнего мельчения участков, т.е. пиксели,
+  лежащие в одной группе будут отнесены к общему классу; для всех пикслей группы расчитывается групповой индекс, полученный на базе усредненного по сценам индекса (<span class="math">\(\overline{V}^g = \frac{\sum_{i=1}^M \overline{V}_i}{M}\)</span>, где <span class="math">\(M\)</span> -- число пикселей в группе).</li>
+<li>решающий критерий отвечает за то, к какому классу следует отнести выделенную группу.</li>
+</ul>
+<p>Таким образом работа происходит в несколько этапов: выделение групп, затем рассчет групповых индексов и принятие решения о том, следует ли отнести группу к тому или иному классу или же передать эти пиксели на дальнейшую обработку.</p>
+<h4>Выделение водных поверхностей</h4>
+<p>После исключения из анализа льда, солончаков и влажных почв оставшиеся пиксели классифицируются как "временно заливаемые территории", "постоянные водные объекты" и "суша". На этом этапе наибольшую
+трудность представляют тени, которые по своим свойствам перемешиваются с водной поверхностью =&gt; жизнь облегчит использование ЦМР, которая позволяет отфильтровать тени на склонах. Поэтому:</p>
+<ul>
+<li>группируются пиксели, для которых <span class="math">\(f_{w_i} &gt; 0.7\)</span>, если для более чем половины из них перепад высот составляет менее 5 метров на пиксель (у авторов пиксель 90 метров), то эта группа считается постоянным водным объектом, в противном случае -- тенью;</li>
+<li>группируются пиксели, для которых <span class="math">\(0.1 \leq f_{w_i} \leq 0.7\)</span>, эта группа считается временно заливаемой территорией, если для нее групповой NDWI не менее 0.5 и перепад высот для половины пикселей группы не выше 5 метров на пиксель.</li>
+</ul>
+<p>Все оставшиеся пиксели считаются сушей.</p>
+<h2>Замечания</h2>
+<p>Изначальная статья разрабатывалась на долговременных рядах данных (пара десятков лет), подход будет работать плохо для изменяющихся во времени русел (и авторы подключают дополнительные источники на этот случай). Но нас это не слишком пугает -- у нас глубин анализа два-три года.</p>
+<p>Авторы подбирали параметры и пороги итеративно визуальным контролем. Вполне возможно, что на нашу территорию нужно будет использовать другие значения параметров.</p>
+<h1>Литература</h1>
+<p>[1] Gutman, G., Huang, C., Chander, G., Noojipady, P., &amp; Masek, J. G. (2013). Assessment of the
+NASA-USGS Global Land Survey (GLS) datasets. Remote Sensing of Environment, 134,
+249–265. http://dx.doi.org/10.1016/j.rse.2013.02.026.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html" rel="bookmark"
+                           title="Permalink to Предобработка данных Sentinel-2 в Google EarthEngine">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2019-12-09T00:00:00+03:00">
                 Published: Пн 09 декабря 2019
@@ -28,111 +385,15 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
-</footer><!-- /.post-info --><h1>Задача</h1>
+</footer><!-- /.post-info -->                <h1>Задача</h1>
 <p>Есть большая задача -- построение маски водных объектов по данным ДЗЗ, точнее Sentinel-2. Эта задача разбивается
 на множество отдельных подзадач, в частности сейчас решаем вопрос о сборе обучающих данных для алгоритмов маскирования.</p>
 <p>Для решения этой частной задачи нужно собрать данные Sentinel-2 на интересующую нас территорию и:</p>
 <ul>
-<li>удалить с них облака (возможно, и другие шумы);</li>
-<li>сделать временнУю аггрегацию по каждому каналу за определенный период времени (или несколько периодов);</li>
-<li>подключить дополнительные данные (например, по рельефу), если они нужны.</li>
-</ul>
-<p>Основная задача -- максимально быстро получить первый вариант классификатора, чтобы затем, пользуясь его результатами
-начинать собирать обучающие данные и дополнять их.</p>
-<h1>Ход работ</h1>
-<h2>1. Обучающие данные в первом приближении.</h2>
-<p>В первом приближении водные объекты можно взять в OSM. Они не полные, местами не совпадают с реальными положениями рек (особенно мелких) на снимках, но это очень хороший старт.</p>
-<p>Таким образом были импортированы из ОСМ данные по:</p>
-<ul>
-<li>прибрежная зона;</li>
-<li>площадные объекты внутри суши (озера, крупные реки);</li>
-<li>линейные объекты.</li>
-</ul>
-<h2>2. Предобработка снимков</h2>
-<p>Предобработка укладывается в несколько строчек кода в Google EarthEngine. Фильтрацию облачности оставимна откуп каналу QA, который содержит бинарные маски облачности. Функция  filterCloudSentinel2 анализирует этот канал и маскирует пиксель, если он был помечен облачным в QA. Далее происходит выбрка снимков по датам и географическому охвату.</p>
-<p>Для выбранных снимков производится маскирование облачности и рассчет медианы. Это позволяет по-быстрому избавиться от случайшных флуктуаций в данных получить более устойчивое к шумам изображение. И, наконец, строятся три индекса NDVI, NDWI1 и NDWI2. Первый индекс классический, предназначенный для анализа растительности, а второй и третий -- для анализа воды в листьях и грунте. Думаю, что добавление таких индексов в анализируемый стек каналов может увеличить точность работы (но это не точно )) -- проверим на следующем этапе).</p>
-<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">waterPoly</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">FeatureCollection</span><span class="p">(</span><span class="s2">&quot;users/.../waterPolyPrim&quot;</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">filterCloudSentinel2</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">img</span><span class="p">)</span> <span class="p">{</span>
-  <span class="cm">/*</span>
-<span class="cm">  Bitmask for QA60</span>
-
-<span class="cm">    Bit 10: Opaque clouds</span>
-<span class="cm">        0: No opaque clouds</span>
-<span class="cm">        1: Opaque clouds present</span>
-<span class="cm">    Bit 11: Cirrus clouds</span>
-<span class="cm">        0: No cirrus clouds</span>
-<span class="cm">        1: Cirrus clouds present</span>
-<span class="cm">  */</span>
-
-  <span class="kd">var</span> <span class="nx">quality</span> <span class="o">=</span> <span class="nx">img</span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s1">&#39;QA60&#39;</span><span class="p">).</span><span class="kr">int</span><span class="p">();</span>
-  <span class="kd">var</span> <span class="nx">cloudBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">1024</span><span class="p">);</span>    <span class="c1">// ee.Number(2).pow(10);</span>
-  <span class="kd">var</span> <span class="nx">cirrusBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">2048</span><span class="p">);</span>   <span class="c1">// ee.Number(2).pow(11);</span>
-
-  <span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cloudBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
-  <span class="kd">var</span> <span class="nx">cirrusFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
-  <span class="kd">var</span> <span class="nx">clear</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusFree</span><span class="p">);</span>
-
-  <span class="k">return</span> <span class="nx">img</span><span class="p">.</span><span class="nx">updateMask</span><span class="p">(</span><span class="nx">clear</span><span class="p">);</span>
-<span class="p">};</span>
-
-<span class="kd">var</span> <span class="nx">collection</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">ImageCollection</span><span class="p">(</span><span class="nx">useCollection</span><span class="p">);</span>
-<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Filter</span><span class="p">.</span><span class="nx">date</span><span class="p">(</span><span class="s1">&#39;2019-04-25&#39;</span><span class="p">,</span> <span class="s1">&#39;2019-11-01&#39;</span><span class="p">));</span>
-<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filterBounds</span><span class="p">(</span><span class="nx">waterPoly</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">filterCloudSentinel2</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">median</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">median</span><span class="p">()</span>
-  <span class="p">.</span><span class="nx">expression</span><span class="p">(</span><span class="s1">&#39;b(&quot;B12&quot;,&quot;B11&quot;, &quot;B8A&quot;,&quot;B4&quot;,&quot;B3&quot;,&quot;B2&quot;)&#39;</span><span class="p">)</span>
-  <span class="p">.</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;swir2&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span><span class="s1">&#39;red&#39;</span><span class="p">,</span><span class="s1">&#39;green&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">NDWI1</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;swir1&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI1&#39;</span><span class="p">);</span>
-<span class="kd">var</span> <span class="nx">NDWI2</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;nir&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI2&#39;</span><span class="p">);</span>
-<span class="kd">var</span> <span class="nx">NDVI</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDVI&#39;</span><span class="p">);</span>
-</pre></div>
-
-
-<h1>Что получается</h1>
-<p>Ниже представлен пример снимка высокого разрешения на данную территорию (можно посмотреть его в полном разрешении):
-<img alt="Пример местности" src="images/2019-12-13/highRes.png" title="Пример местности на высоком разрешении" width="90%"></p>
-<p>На снимке хорошо видны реки, озера а также меандры в восточной части фрагмента.</p>
-<p>На следующем снимке на него наложены данные по водным объектам, полученные из OSM. Видно, что не все водные объекты на снимке покрыты (особенно это относится к меандрам Уссури), есть ошибки в позиционировании небольших рек (возможно, русло поменялось?).</p>
-<p><img alt="Пример местности" src="images/2019-12-13/highRes_osm.png" title="Пример местности на высоком разрешении" width="90%"></p>
-<p>Далее представлены снимки Sentinel-2 и рассчитанные индексы:</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Снимок</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>(swir1, nir, red)</td>
-<td><img alt="Пример местности" src="images/2019-12-13/RGB.png" title="RGB Sentinel-2" width="100%"></td>
-</tr>
-<tr>
-<td>NDVI</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDVI.png" title="NDVI" width="100%"></td>
-</tr>
-<tr>
-<td>NDWI1</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDWI1.png" title="NDWI1" width="100%"></td>
-</tr>
-<tr>
-<td>NDWI2</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDWI2.png" title="NDWI2" width="100%"></td>
-</tr>
-</tbody>
-</table>
-<p>Вода везде хорошо "вылезла" кроме NDWI1: видно, что в западной части фрагмента все пересвечено. Похоже, там очень влажные леса, которые дают такой эффект. Видно также, если посмотреть снимки в исходном рарзрешении, что Sentinel-2 может оказаться недостаточным, чтобы уверенно отбить мелкие реки и ручьи, хотя они и просматриваются на снимках. Но в целом видно, что вода должна неплохо отделяется от остальных объектво.</p>
-<h1>Что дальше</h1>
-<p>Следующий шаг -- сбор статистики и посроение первой версии классификатора. Далее будет видно по результатам.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<li>удалить с них облака …</li></ul>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
