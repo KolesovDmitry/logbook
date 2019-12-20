@@ -159,13 +159,13 @@ $$</div>
 <tr>
 <td><span class="math">\(NDLI\)</span></td>
 <td>
-<div class="math">$$\frac{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}$$</div>
+<div class="math">$$\frac{\min[\rho_G, \rho_R] - \max[\rho_{NIR}, \rho_{SWIR}]}{\min[\rho_G, \rho_R] + \max[\rho_{NIR}, \rho_{SWIR}]}$$</div>
 </td>
 <td>NDLI (Normalized Difference Land Index)</td>
 </tr>
 <tr>
 <td><span class="math">\(f_{T_b}\)</span></td>
-<td>Если (NDWI &lt; 0.3): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0.25 )\\ 0.2\times(30-T_b), \qquad (25\leq T_b &lt; 30) \\ 0, \qquad 30 &lt; T_b )  \end{cases};$$</div>  Если (<span class="math">\(NDWI \geq 0.3\)</span>): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0 )\\ 0.2\times(5-T_b), \qquad (0 \leq T_b &lt; 5) \\ 0, \qquad 5 &lt; T_b )  \end{cases}$$</div>
+<td>Если (NDWI &lt; 0.3): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 25 )\\ 0.2\times(30-T_b), \qquad (25\leq T_b &lt; 30) \\ 0, \qquad 30 &lt; T_b )  \end{cases};$$</div>  Если (<span class="math">\(NDWI \geq 0.3\)</span>): <div class="math">$$f_{T_b} =  \begin{cases} 1, \qquad (T_b &lt; 0 )\\ 0.2\times(5-T_b), \qquad (0 \leq T_b &lt; 5) \\ 0, \qquad 5 &lt; T_b )  \end{cases}$$</div>
 </td>
 <td>корректирующий множитель на базе теплового канала</td>
 </tr>
