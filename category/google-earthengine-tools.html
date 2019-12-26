@@ -17,7 +17,144 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/realizatsiia-metodiki-iz-stati-development-of-a-global-90-m-water-body-map-na-baze-sentinel-2.html">Реализация методики из статьи "Development of a global ~90 m water body map..." на базе Sentinel-2</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2019-12-25T00:00:00+03:00">
+                Published: Ср 25 декабря 2019
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
+</footer><!-- /.post-info --><h1>Задача</h1>
+<p>Ранее описывалась <a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">методика поиска водных объектов</a>, разработанная для Landsat. Она
+позволяет строить карты постоянных водных объектов, временно затапливаемых территорий, а также похожих на них по своим спектральным свойствам участков (лед, солончаки, и т.п.).
+Ниже рассматривается реализация "в лоб", выполненная в GEE на базе Sentinel-2.</p>
+<h1>Сложности</h1>
+<p>Исходная методика была сделана на базе данных Landsat-7 (и более ранних КА), разрешение результирующего слоя - 90 метров. При переходе на Sentinel возникают следующие трудности:</p>
+<ul>
+<li>в исходной методике использовался не "сырой" Landsat, а подготовленные композиты, которых для Сентинеля просто нет; но если посмотреть статью, то видно, что
+   особой необходимости в использованиии именно композитов нет, это был, скорее, вопрос удобства или вычислительных мощностей (статья описывает глобальный подход, там требования к
+   железу велики);</li>
+<li>более сложно то, что статья активно использует тепловой канал, которого у Сентинеля по просту нет; пришлось выкручиваться тем, что при работе на каждый анализируемый момент времени
+   были созданы два композита -- Сентинель и, за тот же период, Ландсат; к каналам Сентинеля был приклеен тепловой канал с Ландсата, затем дальнейшая работа пошла по исходной методике;
+   также возникли сложности с тем, что у нас в работе использовался восьмой Ландсат, у которого два тепловых канала (причем оба в сумме будут короче соответствующего канала 7-го Ландсата);</li>
+<li>коэффициенты и пороги, описанные в статье, подбирались авторами на глаз, создавались для глобального продукта и на Ландсатах; в нашем случае продукт региональный и на Сентинеле; таким образом выходит, что
+   эти параметры нужно подбирать под наши условия, и это отдельная история.</li>
+</ul>
+<p>Тем не менее, сделав скидку на эти отличия, методика в первом приближении была реализована, и можно смотреть первые результаты.</p>
+<h1>Реализация</h1>
+<ul>
+<li>Для удобства использования все константы, описанные в статье, вынесены в отдельный модуль Yamazaki/constants, <a href="https://code.earthengine.google.com/6283a5042b243b041c3cce78eeb1b1bb">текущая версия</a>.</li>
+<li>Предобработка данных в общих чертах следует той, что  <a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">была описана ранее</a>, основные функции вынесены в отдельный модуль Preprocess, <a href="https://code.earthengine.google.com/1373113556075e0857ec0c37c6b4f28c">текущая версия</a>.</li>
+<li>Основные растры, используемые в работе, генерируются отдельным скриптом и сохраняются в ASSETS, это позволяет использовать закэшированные данные, что ускоряет процесс анализа на последних этапах. В то же время такой подход не позволяет на лету менять те параметры, от которых зависят созданные растры: при изменении этих параметров требуется перегенерировать "кэш". Скрипт называется Yamazaki/createFactors, <a href="https://code.earthengine.google.com/9d86acaa489cc125e8f1644c34c7a88b">текущаяя версия</a>. Вместо эпох, использованных в исходной статье здесь были сгенерированы помесячные композиты (для Сентинелей - все требуемые методикой каналы, для Ландсатов - TIR2 за тот же период); использовались летние данные за последние два года, получилось 12 композитов.</li>
+<li>Функции, описанные в статье вынесены в модуль Yamazaki/functions, <a href="https://code.earthengine.google.com/e6d8d1e1cd98e5ff99bb58667d68c9e9">текущая версия</a>.</li>
+<li>Правила классификации (групповые и решающие), а также сами процедуры классификации хранятся в модуле Yamazaki/classifier, <a href="https://code.earthengine.google.com/d77690c54a571c61860bce1e671e6cc1">текущая версия</a>. Данный модуль также экспортирует на диск результат классификации.</li>
+</ul>
+<h1>Результаты</h1>
+<p>В целом результаты приемлемые (с учетом того, что это первый пробный шар, и у нас есть множество вариантов улучшения качества): вода в целом выделена, хотя и не без ошибок. Наиболее частые ошибки -- отнесение ручьев и небольших рек к временно заливаемой территории (а также пропуски таких участков). Иногда также водная поверхность была отнесена к влажной почве. Многие из этих ошибок могут быть исправлены за счет настройки пороговых значений классификатора.
+Как и ожидалось, ни снежных участков (т.к. использовались данные за летний период), ни солончаков на нашей территории не обнаружилось. Довольно много было помечено влажных почв/сырой растительности.</p>
+<h2>Примеры</h2>
+<p>На рисунках приводятся примеры отмеченных ситуаций. Интерактивный вариант карты можно посмотреть в <a href="https://kolesov.nextgis.com/resource/1981/display?panel=layers">NextGIS Web</a>.</p>
+<h3>Легенда</h3>
+<p><img alt="Legend" src="images/2019-12-25/Legend.png" title="Легенда"></p>
+<h3>Южная часть озера Ханка</h3>
+<p>На снимке показана южная часть озера Ханка (со шторкой, чтобы была частично видна подложка), на рисунке видно, что озеро было помечено верно.</p>
+<p><img alt="Озеро Ханка" src="images/2019-12-25/Figure1.png" title="Озеро Ханка"></p>
+<h3>Реки</h3>
+<p>Река Уссури на значительном протяжении была помечена как временно заливаемая территория (а местами и вообще, как влажная почва).</p>
+<p><img alt="Уссури" src="images/2019-12-25/Figure2.png" title="Уссури"></p>
+<p>Мелкие реки могут быть вообще не распознаны как водные объекты, например, река Быстрая (ширина реки в данном месте около 15-ти метров).</p>
+<p><img alt="Быстрая" src="images/2019-12-25/Figure3.png" title="Быстрая"></p>
+<h2>Причины ошибок</h2>
+<p>Причин ошибок, нужно думать, довольно много, но вот те, что бросаются в глаза:</p>
+<ul>
+<li>не оптимально выставлены параметры алгоритма; например, если использовать параметр отнесения пикселя к постоянному водному объекту <span class="math">\(f_{w_i}&gt;0.7\)</span> (как рекомендуется в статье),
+  то на рассматриваемой территории воды почти не будет найдено;</li>
+<li>учет рельефа: в исходной статье использовалось правило, что если перепад высот на участке будет превышать 5 метров на пиксель (у них пиксель 90 метров), то это - теневой склон; в нашем
+  случае такое правило (с поправкой на размер нашего пикселя) приводит к тому, что часть водных объектов отбраковывается (см. пример выше с реками); возможно, это связано с
+  тем, что используемый рельеф (SRTM) слишком груб для нашего разрешения.</li>
+</ul>
+<h1>Дальнейшие действия</h1>
+<p>Первым делом нужно будет заняться подбором параметров алгоритмов, далее будем действовать по результатам. Как минимум уже сейчас полученный классификатор можно использовать как
+вспомогательное средство для создания обучающих примеров для более сложных алгоритмов.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html" rel="bookmark"
+                           title="Permalink to Предобработка данных Sentinel-2 в Google EarthEngine">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2019-12-13T00:00:00+03:00">
                 Published: Пт 13 декабря 2019
@@ -28,107 +165,17 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
-</footer><!-- /.post-info --><h1>Задача</h1>
+</footer><!-- /.post-info -->                <h1>Задача</h1>
 <p>Есть большая задача -- построение маски водных объектов по данным ДЗЗ, точнее Sentinel-2. Эта задача разбивается
 на множество отдельных подзадач, в частности сейчас решаем вопрос о сборе обучающих данных для алгоритмов маскирования.</p>
 <p>Для решения этой частной задачи нужно собрать данные Sentinel-2 на интересующую нас территорию и:</p>
 <ul>
-<li>удалить с них облака (возможно, и другие шумы);</li>
-<li>сделать временнУю аггрегацию по каждому каналу за определенный период времени (или несколько периодов);</li>
-<li>подключить дополнительные данные (например, по рельефу), если они нужны.</li>
-</ul>
-<p>Основная задача -- максимально быстро получить первый вариант классификатора, чтобы затем, пользуясь его результатами
-начинать собирать обучающие данные и дополнять их.</p>
-<h1>Ход работ</h1>
-<h2>1. Обучающие данные в первом приближении.</h2>
-<p>В первом приближении водные объекты можно взять в OSM. Они не полные, местами не совпадают с реальными положениями рек (особенно мелких) на снимках, но это очень хороший старт.</p>
-<p>Таким образом были импортированы из ОСМ данные по:</p>
-<ul>
-<li>прибрежная зона;</li>
-<li>площадные объекты внутри суши (озера, крупные реки);</li>
-<li>линейные объекты.</li>
-</ul>
-<h2>2. Предобработка снимков</h2>
-<p>Предобработка укладывается в несколько строчек кода в Google EarthEngine. Фильтрацию облачности оставимна откуп каналу QA, который содержит бинарные маски облачности. Функция  filterCloudSentinel2 анализирует этот канал и маскирует пиксель, если он был помечен облачным в QA. Далее происходит выбрка снимков по датам и географическому охвату.</p>
-<p>Для выбранных снимков производится маскирование облачности и рассчет медианы. Это позволяет по-быстрому избавиться от случайшных флуктуаций в данных получить более устойчивое к шумам изображение. И, наконец, строятся три индекса NDVI, NDWI1 и NDWI2. Первый индекс классический, предназначенный для анализа растительности, а второй и третий -- для анализа воды в листьях и грунте. Думаю, что добавление таких индексов в анализируемый стек каналов может увеличить точность работы (но это не точно )) -- проверим на следующем этапе).</p>
-<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">waterPoly</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">FeatureCollection</span><span class="p">(</span><span class="s2">&quot;users/.../waterPolyPrim&quot;</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">filterCloudSentinel2</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">img</span><span class="p">)</span> <span class="p">{</span>
-  <span class="cm">/*</span>
-<span class="cm">  Bitmask for QA60</span>
-
-<span class="cm">    Bit 10: Opaque clouds</span>
-<span class="cm">        0: No opaque clouds</span>
-<span class="cm">        1: Opaque clouds present</span>
-<span class="cm">    Bit 11: Cirrus clouds</span>
-<span class="cm">        0: No cirrus clouds</span>
-<span class="cm">        1: Cirrus clouds present</span>
-<span class="cm">  */</span>
-
-  <span class="kd">var</span> <span class="nx">quality</span> <span class="o">=</span> <span class="nx">img</span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s1">&#39;QA60&#39;</span><span class="p">).</span><span class="kr">int</span><span class="p">();</span>
-  <span class="kd">var</span> <span class="nx">cloudBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">1024</span><span class="p">);</span>    <span class="c1">// ee.Number(2).pow(10);</span>
-  <span class="kd">var</span> <span class="nx">cirrusBit</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nb">Number</span><span class="p">(</span><span class="mi">2048</span><span class="p">);</span>   <span class="c1">// ee.Number(2).pow(11);</span>
-
-  <span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cloudBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
-  <span class="kd">var</span> <span class="nx">cirrusFree</span> <span class="o">=</span> <span class="nx">quality</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusBit</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
-  <span class="kd">var</span> <span class="nx">clear</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">bitwiseAnd</span><span class="p">(</span><span class="nx">cirrusFree</span><span class="p">);</span>
-
-  <span class="k">return</span> <span class="nx">img</span><span class="p">.</span><span class="nx">updateMask</span><span class="p">(</span><span class="nx">clear</span><span class="p">);</span>
-<span class="p">};</span>
-
-<span class="kd">var</span> <span class="nx">collection</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">ImageCollection</span><span class="p">(</span><span class="nx">useCollection</span><span class="p">);</span>
-<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Filter</span><span class="p">.</span><span class="nx">date</span><span class="p">(</span><span class="s1">&#39;2019-04-25&#39;</span><span class="p">,</span> <span class="s1">&#39;2019-11-01&#39;</span><span class="p">));</span>
-<span class="nx">collection</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">filterBounds</span><span class="p">(</span><span class="nx">waterPoly</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">cloudFree</span> <span class="o">=</span> <span class="nx">collection</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">filterCloudSentinel2</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">median</span> <span class="o">=</span> <span class="nx">cloudFree</span><span class="p">.</span><span class="nx">median</span><span class="p">()</span>
-  <span class="p">.</span><span class="nx">expression</span><span class="p">(</span><span class="s1">&#39;b(&quot;B12&quot;,&quot;B11&quot;, &quot;B8A&quot;,&quot;B4&quot;,&quot;B3&quot;,&quot;B2&quot;)&#39;</span><span class="p">)</span>
-  <span class="p">.</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;swir2&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span><span class="s1">&#39;red&#39;</span><span class="p">,</span><span class="s1">&#39;green&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">);</span>
-
-<span class="kd">var</span> <span class="nx">NDWI1</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;swir1&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI1&#39;</span><span class="p">);</span>
-<span class="kd">var</span> <span class="nx">NDWI2</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;nir&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDWI2&#39;</span><span class="p">);</span>
-<span class="kd">var</span> <span class="nx">NDVI</span> <span class="o">=</span> <span class="nx">median</span><span class="p">.</span><span class="nx">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">]).</span><span class="nx">multiply</span><span class="p">(</span><span class="mi">10000</span><span class="p">).</span><span class="nx">int16</span><span class="p">().</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;NDVI&#39;</span><span class="p">);</span>
-</pre></div>
-
-
-<h1>Что получается</h1>
-<p>Ниже представлен пример снимка высокого разрешения на данную территорию (можно посмотреть его в полном разрешении):
-<img alt="Пример местности" src="images/2019-12-13/highRes.png" title="Пример местности на высоком разрешении" width="90%"></p>
-<p>На снимке хорошо видны реки, озера а также меандры в восточной части фрагмента.</p>
-<p>На следующем снимке на него наложены данные по водным объектам, полученные из OSM. Видно, что не все водные объекты на снимке покрыты (особенно это относится к меандрам Уссури), есть ошибки в позиционировании небольших рек (возможно, русло поменялось?).</p>
-<p><img alt="Пример местности" src="images/2019-12-13/highRes_osm.png" title="Пример местности на высоком разрешении" width="90%"></p>
-<p>Далее представлены снимки Sentinel-2 и рассчитанные индексы:</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Снимок</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>(swir1, nir, red)</td>
-<td><img alt="Пример местности" src="images/2019-12-13/RGB.png" title="RGB Sentinel-2" width="100%"></td>
-</tr>
-<tr>
-<td>NDVI</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDVI.png" title="NDVI" width="100%"></td>
-</tr>
-<tr>
-<td>NDWI1</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDWI1.png" title="NDWI1" width="100%"></td>
-</tr>
-<tr>
-<td>NDWI2</td>
-<td><img alt="Пример местности" src="images/2019-12-13/NDWI2.png" title="NDWI2" width="100%"></td>
-</tr>
-</tbody>
-</table>
-<p>Вода везде хорошо "вылезла" кроме NDWI1: видно, что в западной части фрагмента все пересвечено. Похоже, там очень влажные леса, которые дают такой эффект. Видно также, если посмотреть снимки в исходном рарзрешении, что Sentinel-2 может оказаться недостаточным, чтобы уверенно отбить мелкие реки и ручьи, хотя они и просматриваются на снимках. Но в целом видно, что вода должна неплохо отделяется от остальных объектво.</p>
-<h1>Что дальше</h1>
-<p>Следующий шаг -- сбор статистики и посроение первой версии классификатора. Далее будет видно по результатам.</p>                </article>
-            </aside><!-- /#featured -->
+<li>удалить с них облака …</li></ul>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+                </ol><!-- /#posts-list -->
+                </section><!-- /#content -->
         <section id="extras" class="body">
         </section><!-- /#extras -->
 
