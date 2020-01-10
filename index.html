@@ -99,7 +99,7 @@
   <span class="p">});</span>
 <span class="kd">var</span> <span class="nx">sampleTraining</span> <span class="o">=</span> <span class="nx">withNeighborhood</span><span class="p">.</span><span class="nx">sampleRegions</span><span class="p">({</span>
     <span class="nx">collection</span><span class="o">:</span> <span class="nx">waterPoly</span><span class="p">,</span>
-    <span class="nx">scale</span><span class="o">:</span> <span class="nx">consts</span><span class="p">.</span><span class="nx">SCALE</span><span class="o">*</span><span class="mi">4</span><span class="p">,</span>
+    <span class="nx">scale</span><span class="o">:</span> <span class="nx">consts</span><span class="p">.</span><span class="nx">SCALE</span><span class="p">,</span>
     <span class="nx">projection</span><span class="o">:</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">Projection</span><span class="p">(</span><span class="s1">&#39;EPSG:3857&#39;</span><span class="p">),</span>
     <span class="nx">tileScale</span><span class="o">:</span> <span class="mi">1</span>
   <span class="p">});</span>
@@ -108,14 +108,20 @@
 <span class="c1">// на диск,</span>
 <span class="nx">Export</span><span class="p">.</span><span class="nx">table</span><span class="p">.</span><span class="nx">toCloudStorage</span><span class="p">({</span>
   <span class="nx">collection</span><span class="o">:</span> <span class="nx">sampleTraining</span><span class="p">,</span>
-  <span class="nx">bucket</span><span class="o">:</span> <span class="s1">&#39;klsvd_gee&#39;</span><span class="p">,</span>
+  <span class="nx">bucket</span><span class="o">:</span> <span class="o">&lt;</span><span class="nx">Name</span><span class="o">-</span><span class="nx">Of</span><span class="o">-</span><span class="nx">Bucket</span><span class="o">&gt;</span><span class="p">,</span>
   <span class="nx">fileFormat</span><span class="o">:</span> <span class="s1">&#39;TFRecord&#39;</span><span class="p">,</span>
   <span class="nx">description</span><span class="o">:</span> <span class="s1">&#39;WaterClasses&#39;</span>
 <span class="p">});</span>
 </pre></div>
 
 
-<p>В итоге будет получен набор данных (тайлы изображения) в формате TFRecord, который можно будет использовать непосредственно в TenorFlow.</p>                </article>
+<p>В итоге будет получен набор данных (тайлы изображения) в формате TFRecord, который можно будет использовать непосредственно в TenorFlow.</p>
+<p>Из неочевидного в этом процессе следует отметить, что</p>
+<ul>
+<li>растровые данные нужно перепроецировать и задать им масштаб, проекция по умолчанию (epsg:4326) не может быть использована;</li>
+<li>значения "no-data" лучше замаскировать заранее, иначе неполные тайлы будут отброшены (а поскольку разметка не полная, то таких
+  тайлов большинство).</li>
+</ul>                </article>
             </aside><!-- /#featured -->
                 <section id="content" class="body">
                     <h1>Other articles</h1>
