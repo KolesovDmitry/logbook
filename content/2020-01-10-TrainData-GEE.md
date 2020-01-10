@@ -1,0 +1,102 @@
+date: 2020-01-10
+title:  Создание обучающих данных в GEE для классификации внешними ресурсами
+tags: Remote Sensing, GEE
+Category: Google EarthEngine tools
+
+
+
+Периодически возникает необходимость создать обучающее множество примеров на базе данных,
+подготовленных к анализу в GEE.
+
+# Попиксельный анализ
+
+Если планируется попиксельный анализ, то обычно все довольно просто,
+нужно подготовить к анализу снимки ([см., скажем, этот пример]({filename}/2019-12-13-GEE.md)),
+а затем сгенерировать набор точек и прочитать под этими точками значения яркостей каналов полученных снимков.
+
+Полученную выборку затем можно экспортировать на диск (для попиксельного анализа удобно это делать в формате CSV),
+на практике весь прооцесс выглядит  как-то так:
+
+```{javascript}
+// data -- интересующий нас растр
+// waterPoly -- полигоны, в которых закодированы классы объектов
+// properties -- список полей, которые интересно сохранить в выборке
+var points = data.sampleRegions({
+  collection: waterPoly,
+  properties: ['ID','G1WBM','VEGTYPE'],
+  scale: 15,
+  tileScale: 1
+});
+
+Export.table.toDrive({
+  collection: points,
+  description:'Points_sample',
+  folder: 'EE',
+  fileFormat: 'CSV'
+});
+```
+
+На выходе получится файл CSV примерно такого вида:
+```
+>  head -3 Points_sample.csv | cut -d, -f1-6
+
+system:index,G1WBM,ID,VEGTYPE,green,green_1
+00000000000000000024_0,0,38,shadow,0.0599,0.0732
+00000000000000000024_1,0,38,shadow,0.0599,0.0748
+```
+где G1WBM, ID, VEGTYPE -- поля исходных полигональных объектов, а green, green_1,... -- яркости пикселей соответствующих каналов снимка
+(в данном примере в снимке было собрано несколько зеленых каналов).
+
+# Пообъектный анализ
+
+В случае, когда планируется не попиксельный, а пообъектный анализ, предыдущий подход не годится из-за того,
+что теряется информация о соседстве. Для пообъектного анализа требуется нарезать снимки и обучающие полигоны на
+небольшие тайлы, а затем экспортировать их.
+
+GEE предоставляет возможность экспорта данных в формате TFRecord, что удобно, если планируется дальнейшее
+построение классификатора в TensorFlow.
+
+```{javascript}
+// Глобальная переменная для no-data
+var MASK_VALUE = -999;
+
+// Растеризуем полигоны для растра контуров объектов
+var waterImage = waterPoly.reduceToImage({
+    properties: ['G1WBM'],
+    reducer: ee.Reducer.first()
+}).unmask(MASK_VALUE).rename('CLASS');
+
+// Добавим растр известных объектов к нашему входному изображению
+// composite -- интересующее нас изображение
+// Добавление растра waterImage позволит встроить контуры ответов
+// отдельным каналом рядом с каналами входных данных
+var data = ee.Image([
+  waterImage, composite
+]);
+
+var PIXELS = 9;  // Сторона скользящего окна,
+    	     	 // получаем тайл в 19x19 пикселей
+
+// Делаем выборку тайлов
+var withNeighborhood = data.neighborhoodToArray({
+    kernel: ee.Kernel.rectangle(PIXELS, PIXELS, 'pixels'),
+    defaultValue: MASK_VALUE
+  });
+var sampleTraining = withNeighborhood.sampleRegions({
+    collection: waterPoly,
+    scale: consts.SCALE*4,
+    projection: ee.Projection('EPSG:3857'),
+    tileScale: 1
+  });
+  
+// Если объемы большие, лучше экспортировать не
+// на диск,
+Export.table.toCloudStorage({
+  collection: sampleTraining,
+  bucket: 'klsvd_gee',
+  fileFormat: 'TFRecord',
+  description: 'WaterClasses'
+});
+```
+
+В итоге будет получен набор данных (тайлы изображения) в формате TFRecord, который можно будет использовать непосредственно в TenorFlow.
