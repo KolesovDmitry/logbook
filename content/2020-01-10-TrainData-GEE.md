@@ -84,7 +84,7 @@ var withNeighborhood = data.neighborhoodToArray({
   });
 var sampleTraining = withNeighborhood.sampleRegions({
     collection: waterPoly,
-    scale: consts.SCALE*4,
+    scale: consts.SCALE,
     projection: ee.Projection('EPSG:3857'),
     tileScale: 1
   });
@@ -93,10 +93,16 @@ var sampleTraining = withNeighborhood.sampleRegions({
 // на диск,
 Export.table.toCloudStorage({
   collection: sampleTraining,
-  bucket: 'klsvd_gee',
+  bucket: <Name-Of-Bucket>,
   fileFormat: 'TFRecord',
   description: 'WaterClasses'
 });
 ```
 
 В итоге будет получен набор данных (тайлы изображения) в формате TFRecord, который можно будет использовать непосредственно в TenorFlow.
+
+Из неочевидного в этом процессе следует отметить, что
+
+* растровые данные нужно перепроецировать и задать им масштаб, проекция по умолчанию (epsg:4326) не может быть использована;
+* значения "no-data" лучше замаскировать заранее, иначе неполные тайлы будут отброшены (а поскольку разметка не полная, то таких
+  тайлов большинство).
