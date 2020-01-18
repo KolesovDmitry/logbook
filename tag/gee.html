@@ -17,7 +17,307 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/sozdanie-obuchaiushchikh-dannykh-v-gee-dlia-klassifikatsii-vneshnimi-resursami.html">Создание обучающих данных в GEE для классификации внешними ресурсами</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/podbor-parametrov-modelei-dlia-gee.html">Подбор параметров моделей для GEE</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-01-18T00:00:00+03:00">
+                Published: Сб 18 января 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
+</footer><!-- /.post-info --><p>Google EarthEngine позволяет быстро строить модели для обработки данных ДЗЗ, но в текущей версии GEE нет каких-либо
+функций, которые обеспечвают поиск оптимальных параметров моделей. Возможно, они появятся позднее (GEE очень быстро
+развивается), но сейчас приходится выкручиваться самостоятельно.</p>
+<p>Пока самый простой в реализации способ из обнаруженных -- подбор параметров внешним скриптом. Общая идея такова:</p>
+<ul>
+<li>пишется модель на Python API, которая выполняет нужные нам действия;</li>
+<li>модель оборачивается в функцию, которая принимает на вход параметры модели или в отдельный скрипт,
+   который принимает параметры из командной строки и затем вызвается из нее;</li>
+<li>строится цикл, состоящий из процедур обучения модели и проверки качества ее работы; в этом цикле по той
+   или иной схеме перебираются параметры модели; самый простой вариант -- поиск параметров на решетке, но
+   можно и заморочиться тем, что скрипт закидывается в специальный софт для оптимизации.</li>
+</ul>
+<p>Ниже на примере подбора параметров случайного леса.</p>
+<h1>Предварительные действия</h1>
+<p>Необходимо сначала:</p>
+<ul>
+<li>установить Python API, процедура хорошо описана в <a href="https://developers.google.com/earth-engine/python_install">официальной документации</a>, нет смысла повторяться;</li>
+<li>получить ключ доступа к движку GEE, выполнив из командной строки:</li>
+</ul>
+<div class="highlight"><pre><span></span>earthengine authenticate
+</pre></div>
+
+
+<p>появится поле ввода и ссылка, по которой нужно перейти, а затем ввести ключ в поле ввода;</p>
+<ul>
+<li>в любом скрипте, в котором будет происходить работа с GEE нужно будет перед началом всех действий инициализировать GEE; простейший пример:</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ee</span>
+
+<span class="c1"># Initialize the Earth Engine module.</span>
+<span class="n">ee</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
+
+<span class="c1"># Print metadata for a DEM dataset.</span>
+<span class="k">print</span><span class="p">(</span><span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="s1">&#39;USGS/SRTMGL1_003&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">())</span>
+</pre></div>
+
+
+<h1>Подбор параметров модели</h1>
+<p>Готовый к использованию код лежит в <a href="https://gitlab.com/nextgis_private/gee_ural/tree/master/scripts">репозитории</a>. Ниже описываются
+лишь основные моменты, необходимые для понимания, а в исходном коде из репозитория есть детали, не влияющие на прицнип, но внесенные
+в код из практических соображений использования.</p>
+<p>Вся система состоит из двух файлов:</p>
+<ul>
+<li>trainner.py: файл-обертка над функциями обучения, содержит процедуру подбора параметров, оформлено все в виде утилиты командной строки;</li>
+<li>utils.py: файл содержит основные функции (описание моделей, расчет точности и т.п.).</li>
+</ul>
+<h2>Модель и оценка точности</h2>
+<p>Данные функции определяются в файле utils.py</p>
+<h3>Описание классификатора</h3>
+<p>Алгоритм случайного леса строит <span class="math">\(B\)</span> деревьев, каждое из которых в классическом варианте конструируются по следующей схеме:</p>
+<p><img alt="RandomForest" src="images/2020-01-18/RandomForest.png" title="Построение случайного леса" width="70%"></p>
+<p>Модель случайного леса, используемая в GEE содержит следующие настраиваемые параметры:</p>
+<ul>
+<li>numberOfTrees: число деревьев, используемых при построении леса (величина <span class="math">\(B\)</span> в обозначениях алгоритма);</li>
+<li>variablesperSplit: число переменных, участвующих в разбиении пространства признаков при построении леса (величина <span class="math">\(m\)</span> в обозначениях алгоритма);</li>
+<li>minLeafPopulation: разбиение прекращается при достижении данного числа объектов в узле дерева (величина <span class="math">\(n_{min}\)</span>);</li>
+<li>bagFraction: доля примеров, используемых при построении дерева, по отношению к общему числу имеющихся примеров;</li>
+<li>outOfBagMode: использовать ли при построении леса режим "out of bag"; при этом режиме точность классификатора на примере номер <span class="math">\(i\)</span> оценивается только по тем
+  деревьям, в обучении которых данный пример не учавствовал; режим позволяет одновременно обучать и производить перекрестную проверку обучения (дает
+  возможность не переобучаться, но за счет значительного замедления процедуры обучения);</li>
+<li>seed: настройка датчика случайных чисел.</li>
+</ul>
+<p>Собственно сама функция, обеспечивающая построения классификатора выглядит следующим образом:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">numberOfTrees</span><span class="p">,</span> <span class="n">variablesPerSplit</span><span class="p">,</span> <span class="n">minLeafPopulation</span><span class="p">,</span> <span class="n">bagFraction</span><span class="p">,</span> <span class="n">outOfBagMode</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">collection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">):</span>
+  <span class="n">classifier</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Classifier</span><span class="o">.</span><span class="n">randomForest</span><span class="p">(</span>
+    <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">numberOfTrees</span><span class="p">,</span>
+    <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">variablesPerSplit</span><span class="p">,</span>
+    <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">minLeafPopulation</span><span class="p">,</span>
+    <span class="n">bagFraction</span><span class="o">=</span><span class="n">bagFraction</span><span class="p">,</span>
+    <span class="n">outOfBagMode</span><span class="o">=</span><span class="n">outOfBagMode</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="n">seed</span>
+  <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">classifier</span>
+</pre></div>
+
+
+<p>Она принимает на вход</p>
+<ul>
+<li>параметры классификатора,</li>
+<li>коллекцию обучающих примеров (collection),</li>
+<li>название поля, содержащего метку класса (classname),</li>
+<li>список полей (числовых), которые будут использоваться при обучении (names).</li>
+</ul>
+<p>Результатом работы функции является обученный классификатор.</p>
+<h3>Оценка точности классификатора</h3>
+<p>Точность можно оценивать различными способами, в данном примере показано, как можно
+оценить точность и величину Kappa на обучающем и тестовом множествах.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">getQuality</span><span class="p">(</span><span class="n">classifier</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="n">classname</span><span class="p">):</span>
+  <span class="n">trainAccuracyMatr</span> <span class="o">=</span> <span class="n">classifier</span><span class="o">.</span><span class="n">confusionMatrix</span><span class="p">();</span>
+  <span class="n">trainAcc</span> <span class="o">=</span> <span class="n">trainAccuracyMatr</span><span class="o">.</span><span class="n">accuracy</span><span class="p">();</span>
+  <span class="n">trainKappa</span> <span class="o">=</span> <span class="n">trainAccuracyMatr</span><span class="o">.</span><span class="n">kappa</span><span class="p">();</span>
+
+  <span class="n">testAnswers</span> <span class="o">=</span> <span class="n">testCollection</span><span class="o">.</span><span class="n">classify</span><span class="p">(</span><span class="n">classifier</span><span class="p">);</span>
+  <span class="n">testAccuracyMatr</span> <span class="o">=</span> <span class="n">testAnswers</span><span class="o">.</span><span class="n">errorMatrix</span><span class="p">(</span><span class="n">classname</span><span class="p">,</span> <span class="s1">&#39;classification&#39;</span><span class="p">);</span>
+  <span class="n">testAcc</span> <span class="o">=</span> <span class="n">testAccuracyMatr</span><span class="o">.</span><span class="n">accuracy</span><span class="p">();</span>
+  <span class="n">testKappa</span> <span class="o">=</span> <span class="n">testAccuracyMatr</span><span class="o">.</span><span class="n">kappa</span><span class="p">();</span>
+
+  <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">trainAcc</span><span class="o">=</span><span class="n">trainAcc</span><span class="p">,</span> <span class="n">trainKappa</span><span class="o">=</span><span class="n">trainKappa</span><span class="p">,</span> <span class="n">testAcc</span><span class="o">=</span><span class="n">testAcc</span><span class="p">,</span> <span class="n">testKappa</span><span class="o">=</span><span class="n">testKappa</span><span class="p">,</span> <span class="n">testErrMatr</span><span class="o">=</span><span class="n">testAccuracyMatr</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Функция берет на вход обученный классификатор и тестовое множество, а возвращает словарь значений:</p>
+<ul>
+<li>trainAcc: точность на обучающем множестве,</li>
+<li>trainKappa: Kappa на тестовом множестве,</li>
+<li>testAcc: точность на тестовом множестве,</li>
+<li>testKappa: Kappa на тестовом множестве,</li>
+<li>testErrMatr: матрица ошибок на тестовом множестве.</li>
+</ul>
+<p>В этой функции жестко прописано название поля, содержащего результаты классификации "classification".
+По-хорошему его нужно вынести в параметры функции, но это название генерируется автоматически самим классификатором
+и оно оставлено, чтобы не слишком заморачиваться с числом пробрасываемых сквозь функции параметров.</p>
+<h3>Обучение и оценка</h3>
+<p>Объединение описанных выше шагов в одну функцию для удбства работы:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">testCase</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">trainCollection</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+  <span class="n">classifier</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span>
+    <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;numberOfTrees&#39;</span><span class="p">],</span>
+    <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;variablesPerSplit&#39;</span><span class="p">],</span>
+    <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">],</span>
+    <span class="n">bagFraction</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;bagFraction&#39;</span><span class="p">],</span>
+    <span class="n">outOfBagMode</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;outOfBagMode&#39;</span><span class="p">],</span>
+    <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+    <span class="n">collection</span><span class="o">=</span><span class="n">trainCollection</span><span class="p">,</span> <span class="n">classname</span><span class="o">=</span><span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="n">names</span>
+  <span class="p">)</span>
+  <span class="n">classified</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">classify</span><span class="p">(</span><span class="n">classifier</span><span class="p">)</span>
+  <span class="n">qual</span> <span class="o">=</span> <span class="n">getQuality</span><span class="p">(</span><span class="n">classifier</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="s1">&#39;Class&#39;</span><span class="p">)</span>
+  <span class="n">test</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">qual</span><span class="p">[</span><span class="s1">&#39;trainKappa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getInfo</span><span class="p">(),</span> <span class="n">qual</span><span class="p">[</span><span class="s1">&#39;testKappa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+
+  <span class="k">return</span> <span class="n">test</span><span class="p">,</span> <span class="n">val</span>
+</pre></div>
+
+
+<p>Функция обучает классикатор на заданных параметрах, которые передаются в виде словаря значений, и возвращает два числа -- Kappa на тестовом и обучающем множествах.</p>
+<p>В этой функции жестко прописано название поля с меткой класса ("Class"), по-хорошему, нужно вынести его в параметры функции.
+(Но оставлено по принципу "и так сойдет")</p>
+<h2>Подбор параметров</h2>
+<p>Подбор параметров был сделан в отдельном скрипте, оформленном в виде утилиты командной строки.</p>
+<p>Основой скрипта является функция main, которая производит в цикле процедуру перебора параметров и
+оценки точности классификаторов для этих параметров на обучающем и тестовом множествах.</p>
+<h3>Функция подбора параметров</h3>
+<p>Функция принимает на вход следующие параметры:</p>
+<ul>
+<li>название векторного слоя обучающего множества примеров;</li>
+<li>название векторного слоя тестового множества;</li>
+<li>название растра, который требуется классифицировать; каналы растра -- признаки, использующиеся
+  при классификации;</li>
+<li>название файла формата CSV, в который будут писаться результаты (параметры и точность, достигнутая
+  на этих параметрах);</li>
+</ul>
+<p>В этой функции жестко прописано название поля с меткой класса ("Class"), по-хорошему, нужно вынести его в параметры функции.
+(Но оставлено по принципу "и так сойдет"). Поле 'system:index' генерируется автоматически GEE и не несет никакой смысловой
+нагрузки, поэтому удаляется сразу же.</p>
+<p>Вообще в этой функции много жестко зашитых параметров (число проверямых деревьев, число листьев и т.п.), но
+этот скрипт используется в экспериментов, поэтому все эти параметры правятся по необходимости и под каждую задачу.
+Поэтому (ИМХО) нет большого смысла их параметризовывать и выносить их вовне.</p>
+<p>Функция пробегает по решетке параметров и для каждого набора строит классификатор, а затем оценивает его точность.
+При необходимости можно перестроить шаг по каждому из параметров.</p>
+<p>Важно отметить, что тут во всех классификаторах используется параметр <code>outOfBagMode=False</code>, это позволяет ускорить
+процесс работы (хотя и повысить шансы на переобучение).</p>
+<p>Кроме того, в случае, когда используется большое число каналов в растре и строится сложный классификатор (число деревьев, листьев),
+то может возникнуть ошибка таймаута GEE. В этом случае возникает ошибка <code>ee.EEException</code>, которая отлавливается и игнорируется (с
+записью в лог соотвествующего сообщения).</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">landTrain</span><span class="p">,</span> <span class="n">landVal</span><span class="p">,</span> <span class="n">dataSetName</span><span class="p">,</span> <span class="n">resultCSV</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="c1"># Список полей, используемых для обучения:</span>
+    <span class="n">NAMES</span> <span class="o">=</span> <span class="n">landTrain</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">propertyNames</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;system:index&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;Class&#39;</span><span class="p">)</span>
+    <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">NAMES</span><span class="o">.</span><span class="n">getInfo</span><span class="p">())</span>
+
+    <span class="n">image</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">dataSetName</span><span class="p">);</span>
+
+    <span class="c1"># Собираем список из количества переменных, для которых будут строиться классификаторы</span>
+    <span class="n">variable_counts</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">[</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">]])</span> <span class="o">-</span> <span class="nb">set</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+    <span class="n">variable_counts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">variable_counts</span><span class="p">)</span>
+    <span class="n">variable_counts</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">resultCSV</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">csvfile</span><span class="p">:</span>
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">csvfile</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;trainKappa&#39;</span><span class="p">,</span> <span class="s1">&#39;valKappa&#39;</span><span class="p">,</span> <span class="s1">&#39;numberOfTrees&#39;</span><span class="p">,</span> <span class="s1">&#39;variablesperSplit&#39;</span><span class="p">,</span> <span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">,</span> <span class="s1">&#39;bagFraction&#39;</span><span class="p">]</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">numberOfTrees</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">500</span><span class="p">]:</span>
+          <span class="k">for</span> <span class="n">variablesPerSplit</span> <span class="ow">in</span> <span class="n">variable_counts</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">minLeafPopulation</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">300</span><span class="p">]:</span>
+              <span class="k">for</span> <span class="n">bagFraction</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                  <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">numberOfTrees</span><span class="p">,</span>
+                  <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">variablesPerSplit</span><span class="p">,</span>
+                  <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">minLeafPopulation</span><span class="p">,</span>
+                  <span class="n">bagFraction</span><span class="o">=</span><span class="n">bagFraction</span><span class="p">,</span>
+                  <span class="n">outOfBagMode</span><span class="o">=</span><span class="kc">False</span>
+                <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">trainKappa</span><span class="p">,</span> <span class="n">valKappa</span> <span class="o">=</span> <span class="n">testCase</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">landTrain</span><span class="p">,</span> <span class="n">landVal</span><span class="p">,</span> <span class="s1">&#39;Class&#39;</span><span class="p">,</span> <span class="n">NAMES</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">trainKappa</span><span class="p">,</span> <span class="n">valKappa</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;numberOfTrees&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;variablesPerSplit&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;bagFraction&#39;</span><span class="p">]]</span>
+                    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">data</span><span class="p">])</span>
+                <span class="k">except</span> <span class="n">ee</span><span class="o">.</span><span class="n">EEException</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;En error occurs for </span><span class="si">%s</span><span class="s1"> params for </span><span class="si">%s</span><span class="s1"> dataset&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">dataSetName</span><span class="p">))</span>
+</pre></div>
+
+
+<h3>Итоговый скрипт и его использование</h3>
+<p>Собственно весь скрипт представляет собой обертку над функцией main: основная часть скрипта -- это анализ параметров командной строки (входные слои, выходной файл).
+Детали реализации скрипта можно посмотреть в репозитории.</p>
+<p>А использование скрипта выглядит примерно так:</p>
+<div class="highlight"><pre><span></span>python trainner.py <span class="se">\</span>
+       --train <span class="s2">&quot;users/kolesovdm/Steppe/set13Train&quot;</span> <span class="se">\</span>
+       --val <span class="s2">&quot;users/kolesovdm/Steppe/set13Val&quot;</span> <span class="se">\</span>
+       --image <span class="s2">&quot;users/kolesovdm/Steppe/dataSet13&quot;</span> <span class="se">\</span>
+       --result <span class="s2">&quot;set13.csv&quot;</span>
+</pre></div>
+
+
+<p>где train -- векторный слой обучающих примеров, val -- векторный слой тестовых примеров, image -- изображение для классификации, result -- куда сохранить параметры и точность, достигаемую на них.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/sozdanie-obuchaiushchikh-dannykh-v-gee-dlia-klassifikatsii-vneshnimi-resursami.html" rel="bookmark"
+                           title="Permalink to Создание обучающих данных в GEE для классификации внешними ресурсами">Создание обучающих данных в GEE для классификации внешними ресурсами</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-01-10T00:00:00+03:00">
                 Published: Пт 10 января 2020
@@ -28,105 +328,15 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
-</footer><!-- /.post-info --><p>Периодически возникает необходимость создать обучающее множество примеров на базе данных,
+</footer><!-- /.post-info -->                <p>Периодически возникает необходимость создать обучающее множество примеров на базе данных,
 подготовленных к анализу в GEE.</p>
 <h1>Попиксельный анализ</h1>
 <p>Если планируется попиксельный анализ, то обычно все довольно просто,
 нужно подготовить к анализу снимки (<a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">см., скажем, этот пример</a>),
-а затем сгенерировать набор точек и прочитать под этими точками значения яркостей каналов полученных снимков.</p>
-<p>Полученную выборку затем можно экспортировать на диск (для попиксельного анализа удобно это делать в формате CSV),
-на практике весь прооцесс выглядит  как-то так:</p>
-<div class="highlight"><pre><span></span><span class="c1">// data -- интересующий нас растр</span>
-<span class="c1">// waterPoly -- полигоны, в которых закодированы классы объектов</span>
-<span class="c1">// properties -- список полей, которые интересно сохранить в выборке</span>
-<span class="kd">var</span> <span class="nx">points</span> <span class="o">=</span> <span class="nx">data</span><span class="p">.</span><span class="nx">sampleRegions</span><span class="p">({</span>
-  <span class="nx">collection</span><span class="o">:</span> <span class="nx">waterPoly</span><span class="p">,</span>
-  <span class="nx">properties</span><span class="o">:</span> <span class="p">[</span><span class="s1">&#39;ID&#39;</span><span class="p">,</span><span class="s1">&#39;G1WBM&#39;</span><span class="p">,</span><span class="s1">&#39;VEGTYPE&#39;</span><span class="p">],</span>
-  <span class="nx">scale</span><span class="o">:</span> <span class="mi">15</span><span class="p">,</span>
-  <span class="nx">tileScale</span><span class="o">:</span> <span class="mi">1</span>
-<span class="p">});</span>
-
-<span class="nx">Export</span><span class="p">.</span><span class="nx">table</span><span class="p">.</span><span class="nx">toDrive</span><span class="p">({</span>
-  <span class="nx">collection</span><span class="o">:</span> <span class="nx">points</span><span class="p">,</span>
-  <span class="nx">description</span><span class="o">:</span><span class="s1">&#39;Points_sample&#39;</span><span class="p">,</span>
-  <span class="nx">folder</span><span class="o">:</span> <span class="s1">&#39;EE&#39;</span><span class="p">,</span>
-  <span class="nx">fileFormat</span><span class="o">:</span> <span class="s1">&#39;CSV&#39;</span>
-<span class="p">});</span>
-</pre></div>
-
-
-<p>На выходе получится файл CSV примерно такого вида:</p>
-<div class="highlight"><pre><span></span><span class="o">&gt;</span>  <span class="n">head</span> <span class="o">-</span><span class="mi">3</span> <span class="n">Points_sample</span><span class="p">.</span><span class="n">csv</span> <span class="o">|</span> <span class="n">cut</span> <span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="o">-</span><span class="n">f1</span><span class="o">-</span><span class="mi">6</span>
-
-<span class="k">system</span><span class="p">:</span><span class="k">index</span><span class="p">,</span><span class="n">G1WBM</span><span class="p">,</span><span class="n">ID</span><span class="p">,</span><span class="n">VEGTYPE</span><span class="p">,</span><span class="n">green</span><span class="p">,</span><span class="n">green_1</span>
-<span class="mi">00000000000000000024</span><span class="n">_0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">38</span><span class="p">,</span><span class="n">shadow</span><span class="p">,</span><span class="mi">0</span><span class="p">.</span><span class="mi">0599</span><span class="p">,</span><span class="mi">0</span><span class="p">.</span><span class="mi">0732</span>
-<span class="mi">00000000000000000024</span><span class="n">_1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">38</span><span class="p">,</span><span class="n">shadow</span><span class="p">,</span><span class="mi">0</span><span class="p">.</span><span class="mi">0599</span><span class="p">,</span><span class="mi">0</span><span class="p">.</span><span class="mi">0748</span>
-</pre></div>
-
-
-<p>где G1WBM, ID, VEGTYPE -- поля исходных полигональных объектов, а green, green_1,... -- яркости пикселей соответствующих каналов снимка
-(в данном примере в снимке было собрано несколько зеленых каналов).</p>
-<h1>Пообъектный анализ</h1>
-<p>В случае, когда планируется не попиксельный, а пообъектный анализ, предыдущий подход не годится из-за того,
-что теряется информация о соседстве. Для пообъектного анализа требуется нарезать снимки и обучающие полигоны на
-небольшие тайлы, а затем экспортировать их.</p>
-<p>GEE предоставляет возможность экспорта данных в формате TFRecord, что удобно, если планируется дальнейшее
-построение классификатора в TensorFlow.</p>
-<div class="highlight"><pre><span></span><span class="c1">// Глобальная переменная для no-data</span>
-<span class="kd">var</span> <span class="nx">MASK_VALUE</span> <span class="o">=</span> <span class="o">-</span><span class="mi">999</span><span class="p">;</span>
-
-<span class="c1">// Растеризуем полигоны для растра контуров объектов</span>
-<span class="kd">var</span> <span class="nx">waterImage</span> <span class="o">=</span> <span class="nx">waterPoly</span><span class="p">.</span><span class="nx">reduceToImage</span><span class="p">({</span>
-    <span class="nx">properties</span><span class="o">:</span> <span class="p">[</span><span class="s1">&#39;G1WBM&#39;</span><span class="p">],</span>
-    <span class="nx">reducer</span><span class="o">:</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">Reducer</span><span class="p">.</span><span class="nx">first</span><span class="p">()</span>
-<span class="p">}).</span><span class="nx">unmask</span><span class="p">(</span><span class="nx">MASK_VALUE</span><span class="p">).</span><span class="nx">rename</span><span class="p">(</span><span class="s1">&#39;CLASS&#39;</span><span class="p">);</span>
-
-<span class="c1">// Добавим растр известных объектов к нашему входному изображению</span>
-<span class="c1">// composite -- интересующее нас изображение</span>
-<span class="c1">// Добавление растра waterImage позволит встроить контуры ответов</span>
-<span class="c1">// отдельным каналом рядом с каналами входных данных</span>
-<span class="kd">var</span> <span class="nx">data</span> <span class="o">=</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">([</span>
-  <span class="nx">waterImage</span><span class="p">,</span> <span class="nx">composite</span>
-<span class="p">]);</span>
-
-<span class="kd">var</span> <span class="nx">PIXELS</span> <span class="o">=</span> <span class="mi">9</span><span class="p">;</span>  <span class="c1">// Сторона скользящего окна,</span>
-                 <span class="c1">// получаем тайл в 19x19 пикселей</span>
-
-<span class="c1">// Делаем выборку тайлов</span>
-<span class="kd">var</span> <span class="nx">withNeighborhood</span> <span class="o">=</span> <span class="nx">data</span><span class="p">.</span><span class="nx">neighborhoodToArray</span><span class="p">({</span>
-    <span class="nx">kernel</span><span class="o">:</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">Kernel</span><span class="p">.</span><span class="nx">rectangle</span><span class="p">(</span><span class="nx">PIXELS</span><span class="p">,</span> <span class="nx">PIXELS</span><span class="p">,</span> <span class="s1">&#39;pixels&#39;</span><span class="p">),</span>
-    <span class="nx">defaultValue</span><span class="o">:</span> <span class="nx">MASK_VALUE</span>
-  <span class="p">});</span>
-<span class="kd">var</span> <span class="nx">sampleTraining</span> <span class="o">=</span> <span class="nx">withNeighborhood</span><span class="p">.</span><span class="nx">sampleRegions</span><span class="p">({</span>
-    <span class="nx">collection</span><span class="o">:</span> <span class="nx">waterPoly</span><span class="p">,</span>
-    <span class="nx">scale</span><span class="o">:</span> <span class="nx">consts</span><span class="p">.</span><span class="nx">SCALE</span><span class="p">,</span>
-    <span class="nx">projection</span><span class="o">:</span> <span class="nx">ee</span><span class="p">.</span><span class="nx">Projection</span><span class="p">(</span><span class="s1">&#39;EPSG:3857&#39;</span><span class="p">),</span>
-    <span class="nx">tileScale</span><span class="o">:</span> <span class="mi">1</span>
-  <span class="p">});</span>
-
-<span class="c1">// Если объемы большие, лучше экспортировать не</span>
-<span class="c1">// на диск,</span>
-<span class="nx">Export</span><span class="p">.</span><span class="nx">table</span><span class="p">.</span><span class="nx">toCloudStorage</span><span class="p">({</span>
-  <span class="nx">collection</span><span class="o">:</span> <span class="nx">sampleTraining</span><span class="p">,</span>
-  <span class="nx">bucket</span><span class="o">:</span> <span class="o">&lt;</span><span class="nx">Name</span><span class="o">-</span><span class="nx">Of</span><span class="o">-</span><span class="nx">Bucket</span><span class="o">&gt;</span><span class="p">,</span>
-  <span class="nx">fileFormat</span><span class="o">:</span> <span class="s1">&#39;TFRecord&#39;</span><span class="p">,</span>
-  <span class="nx">description</span><span class="o">:</span> <span class="s1">&#39;WaterClasses&#39;</span>
-<span class="p">});</span>
-</pre></div>
-
-
-<p>В итоге будет получен набор данных (тайлы изображения) в формате TFRecord, который можно будет использовать непосредственно в TenorFlow.</p>
-<p>Из неочевидного в этом процессе следует отметить, что</p>
-<ul>
-<li>растровые данные нужно перепроецировать и задать им масштаб, проекция по умолчанию (epsg:4326) не может быть использована;</li>
-<li>значения "no-data" лучше замаскировать заранее, иначе неполные тайлы будут отброшены (а поскольку разметка не полная, то таких
-  тайлов большинство).</li>
-</ul>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+а затем сгенерировать набор точек и прочитать под этими точками значения яркостей каналов полученных снимков …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/sozdanie-obuchaiushchikh-dannykh-v-gee-dlia-klassifikatsii-vneshnimi-resursami.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
