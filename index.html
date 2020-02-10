@@ -18,7 +18,185 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/zamechaniia-po-organizatsii-obrabotki-rastrov.html">Замечания по организации обработки растров</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-02-10T00:00:00+03:00">
+                Published: Пн 10 февраля 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/monitoring.html">Monitoring</a> <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> <a href="https://kolesovdmitry.github.io/logbook/tag/fire.html">Fire</a> <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-1.html">Sentinel-1</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи 
+<a href="https://www.nature.com/articles/s41598-019-56967-x.pdf">Y. Ban, P. Zhang, A. Nascetti, A. R. Bevington, and M. A. Wulder, “Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning”</a></strong></p>
+<h2>О чем пойдет речь</h2>
+<p>Статья описывает методы мониторинга пожаров в режиме, близком к режиму реального времени на данных Сентинель-1. Радарная съемка позволяет
+мониторить территории не взирая на облачность и дымы (особенно актуально при мониторинге пожаров).</p>
+<p>Авторы используют сверточные сети и применяют их к анализу свежих изображений, полученных с Сентинель-1, и исторических данными Сентинелей (необходимых
+для оценки вариативности отраженного сигнала).</p>
+<p>Нас эта работа интересует как способ "подсмотреть" методы мониторинга и применить их к мониторингу лесоизменений в целом, а не только пожаров.</p>
+<h2>Исходные данные и результаты</h2>
+<p>Используется Sentinel-1, были построены временные ряды для поляризаций VV и HV, полученные в режиме IW. Территория, на которой производились работы, -
+нескольк площадей в США и Канаде. Оценка работы алгоритмов мониторинга производилась:</p>
+<ul>
+<li>на базе снимков сверхвысокого разрешения Worldview-3;</li>
+<li>снимков Sentinel-2;</li>
+<li>полевых работ.</li>
+</ul>
+<p>Для анализа выбирались несколько областей интереса, расположенных на лесных и не-лесных территориях и различных попографических условиях (высота, склоны и т.п.).
+По этим участкам собиралась статистика того, в каких дипазонах изменяется отраженный сигнал (средние, дисперсии), строились временные ряды сигналов до и после пожаров.
+Поскольку данные радарной съемки зависят от важности почвы и насыщенности растений влагой, то собиралась также информация о суточных атмосферных осадках. На рисунке показаны
+примеры временных рядов для сгоревших и не-сгоревших лесных (графики (a) и (c)) и травянистых участков (графики (b) и (d)).</p>
+<p><img alt="Графики временных рядов" src="images/2020-02-07/Figure1-1.png" title="Графики временных рядов" width="95%"></p>
+<p>Далее авторы приводят куски снимков, показывающих ход распространения пожаров и результаты классификации (пожар/не-пожар) полученные различными методами, начиная с простейших, и
+заканчивая сверточной сетью (logRt, kmap, CNN_*). Также приводится сводная таблица по качеству классификации, из которой видно, что по метрикам <span class="math">\(F_1\)</span> и Kappa сверточная сеть показывает наилучшие результаты.</p>
+<h2>Описание методики</h2>
+<p>Общая схема: как только приходит сигнал о пожаре, из архивной съемки поднимаются имеющиеся данные и составляются статистики по тому,
+как ведет себя отраженный сигнал в "естественных" условиях, т.е. до пожара. Затем производится мониторинг распространения пожара на базе
+сравнения вновь полученных сигналов и исторической съемки.</p>
+<p>Более детально:</p>
+<ul>
+<li>рассчитывается логарифм отношения изображений, полученных до пожара и после пожара;</li>
+<li>строится грубая бинарная маска сгоревших и не-сгоревших участков, для этого используются методы поиска аномалий во временных рядах;</li>
+<li>полученная маска используется в качестве обучающего множества для сверточной сети; сеть возвращает растры, описывающие "уверенность" сети
+ в том, что пожар был;</li>
+<li>на последнем шаге строятся бинарные растры пожар/не-пожар на базе сравнения "уверенности" с автоматически вычисляемым порогом.</li>
+</ul>
+<p>Эта методикаа показана на следующем рисунке и подробно описывается ниже:</p>
+<p><img alt="Графики временных рядов" src="images/2020-02-07/Figure2.png" title="Графики временных рядов" width="95%"></p>
+<h3>Логарифм отношения</h3>
+<p>Выбирается снимок, предшествующий пожару: должен быть таким, чтобы эффекты сезонности были сведены к минимуму и в то же время это не должен быть снимок, полученный после сильного дождя.</p>
+<p>Затем для каждого снимка, полученного после начала пожара строится временной ряд логоарифма отношений:</p>
+<div class="math">$$
+\Delta \beta_r = 10 \log_{10} \left ( \frac{\beta_r^m}{\beta_r^s} \right ),
+$$</div>
+<p>
+где <span class="math">\(r\in ASC_{-\mu}, DSC_{-\mu}\)</span> - индекс снимка, обозначает восходяющую или нисходящую орбиту и его относительный номер (<span class="math">\(\mu\)</span> <span class="math">\(\nu\)</span>), <span class="math">\(m\)</span> -- базовый снимок,
+полученный до начала пожара, с которым производится сравнение, а <span class="math">\(s\)</span> -- снимок полученный после начала пожара. Таким образом получаем временной ряд растров. Аналогичный временной
+ряд строится на основе сравнения базового снимка <span class="math">\(m\)</span> и снимков, полученных до начала пожара; этот временной ряд позволяет оценить вариативность данных в "нормальных" условиях.</p>
+<p>Далее для сокращения записи используется простое обозначение <span class="math">\(\Delta \beta\)</span> вместо <span class="math">\(\Delta \beta_r\)</span>.</p>
+<h3>Поиск аномалий</h3>
+<p>Основываясь на временном ряду снимков, предшествующих пожару, оценивается среднее и стандартное отклонение для логарифма отношений (в каждом пикселе свои статистики).
+Эти статистики вычисляются по всей области интересов отдельно для восходящей и нисходящей орбиты и поляризаций VH и VV:</p>
+<div class="math">$$
+\sigma(i,j)  = \sqrt{\frac{\Sigma_{t=1}^N (\beta^t(i,j) - \overline{\beta}(i,j))^2}{N-1}},
+$$</div>
+<p>
+где <span class="math">\(\overline{\beta}(i,j)\)</span> - средний логарифм отношений в пикселе <span class="math">\((i,j)\)</span>, <span class="math">\(N\)</span> -- число доступных сцен для анализируемой орбиты и поляризации.</p>
+<p>Далее расчитывается величина kmap:</p>
+<div class="math">$$
+I_k(i,j) = \frac{|\Delta \beta(i,j)|}{\sigma(i.j)},
+$$</div>
+<p>
+эта величина оценивает "неожиданность" соответствующего <span class="math">\(|\Delta \beta(i,j)|\)</span> -- чем она выше, тем более аномальным предтавляется отношение логарифмов.
+Пиксель относится к аномальным по превышении некоторого порога:</p>
+<div class="math">$$
+I(i,j) =\begin{cases} 1, \qquad I_k(i,j) \geq k_0 \\ 0, \qquad I_k(i,j) &lt; k_0  \end{cases},
+$$</div>
+<p>
+авторы рекомендуют начать с <span class="math">\(k_0 = 2\)</span>.</p>
+<p>Полученный временной ряд бинарных масок является входном для следующего шага.</p>
+<h3>Сверточная сеть</h3>
+<p>Полученные на предыдущем этапе грубые оценки сгоревших участков используются для автоматического построения обучающего множества.</p>
+<p>Пробегая по всем доступным датам конструируется стек изображений из следуюих слоев:</p>
+<ul>
+<li>базовый снимок;</li>
+<li>текущий снимок;</li>
+<li>растр <span class="math">\(\sigma(i,j)\)</span>;</li>
+<li>данные по рельефу -- высоты, крутизна и экспозиция склонов.</li>
+</ul>
+<p>Случайным образом генерируются одинаковое число примеров сгоревших и не сгоревших участков. Бинарная маска аномалий, рассчитанная на предыдущем этапе,
+является маркером того, считать участок сгоревшим или нет.</p>
+<p>Далее обучается сверточная сеть, которая должна помечать сгоревшие области. Авторы описывают архитектуру своей сверточной сети без особых подробностей, но
+похоже, что это "ванильная" нейросеть: она настроена на классификацию, а не сегментацию (возвращает сгорело/не-сгорело для центрального пикселя участка из 55х55 пикселей).</p>
+<p>Но поскольку на выходе сети у авторов стоит сигмоидальная функция, то выходная величина -- не бинарная, а непрерывная. Полученный растр со значениями из диапазона (0, 1) авторы
+называют растром "уверенности" (confidence map).</p>
+<p>Опционально авторы предлагают использовать результаты обученной сети после первой итерации обучения для того, чтобы уточнить маску пожаров и на основе уточненной маски генерируются дополнительные обучающие примеры.</p>
+<h3>Построение бинарной маски и аггрегация временных рядов</h3>
+<p>Из нейросети выходит непрерывная величина, лежащая в диапазоне (0, 1). Авторы предлагают бинаризовать ее согласно процедуре выбора порога бинаризации Otsu [Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66, https://doi.org/10.1109/ TSMC.1979.4310076 (1979).]. <em>Признаться, я не знаю, что то за процедура, а авторы ее не описывают -- нужно будет заглянуть в первоисточник.</em></p>
+<p>Для того, чтобы построить куммулятивную маску пожаров авторы предлагают использовать два метода:</p>
+<ul>
+<li>быстрый способ состоит в том, чтобы объединить между собой все предыдущие маски;</li>
+<li>второй способ состоит из процедуры постобработки и использует созданные на текущий момент маски, согласно этому методу
+  временной ряд масок обрабатывается гаусовым фильтром во временной области; (<em>не совсем понятно -- гаусов фильтр выдаст опять-таки непрерывную величину, которую снова нужно будет бинаризовать... в чем выгода?</em>)</li>
+</ul>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/zamechaniia-po-organizatsii-obrabotki-rastrov.html" rel="bookmark"
+                           title="Permalink to Замечания по организации обработки растров">Замечания по организации обработки растров</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-02-05T00:00:00+03:00">
                 Published: Ср 05 февраля 2020
@@ -29,162 +207,16 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/grass.html">GRASS</a> <a href="https://kolesovdmitry.github.io/logbook/tag/tensorflow.html">TensorFlow</a> </p>
-</footer><!-- /.post-info --><p>По результатам работы над поиском водных объектов хочется оставить несколько замечаний, касающихся удобств/неудобств обработки большого числа космосьемки
+</footer><!-- /.post-info -->                <p>По результатам работы над поиском водных объектов хочется оставить несколько замечаний, касающихся удобств/неудобств обработки большого числа космосьемки
 при помощи того или иного ПО.</p>
 <h2>Общая характеристика обработки</h2>
 <h3>Особенности методики</h3>
 <p><a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">Методика поиска водных объектов</a> имеет несколько особенностей, характерных для конкретно этой задачи.</p>
 <ol>
-<li>Активная работа с различными каналами по различным формулам. Имеется в виду, что, к примеру, в отличие от классических методов машинного обучения
- (нейросети, деревья решений, логистической регрессии и т.п.) в этой методике каждый канал обрабатывается по своему. Другими словами, в методике нет схемы обработки, единой для
- всех каналов такой, к примеру, как умножение матриц для регрессий/нейросетей или единообразного разбиения пространства признаков деревьями.</li>
-<li>Групповая обработка пикселей: согласно методике, следует анализировать не только отдельные пиксели или скользящие окна, но и группы связанных пикселей, то есть
- по сути требуется сначала произвести сегментацию, а затем в каждом выделенном участке собарать зональные статистики и передать их на следующий этап обработки.</li>
-<li>Хотя сама методика довольно проста, но она оперирует параметрами, которые подбирались авторами "на глаз" и на другую территорию и (главное!) для другого сенсора;
- поэтому для того чтобы получить хороший результат в наших условиях требуется оптимизация параметров алгоритма на наших данных.</li>
-</ol>
-<h3>Особенности данных</h3>
-<p>Помимо специфических требований конкретной методики, возникают также дополнительные ограничения, вытекающие из необходимости обрабатывать большую территорию. В итоге это
-приводит к следующим особенностям:</p>
-<ol>
-<li>Большое количество данных: в область интересов попадает свыше 13 тыс. сцен Sentinel-2 (за два интересующих нас года, причем, это только летних снимков).</li>
-<li>Большая территория влечет за собой большое разнообразие ландшафтов, отдельное удовольствие доставляет не только широтная, но и высотная поясность; в
- итоге нельзя работать только в одном "углу" области интересов, приходится экспериментировать сразу на всем объеме.</li>
-<li>Большая территория подразумевает перепроецирование исходных сцен, т.к. космосьемка приходит в разных проекциях в зависимости от места съемки;</li>
-<li>Чтобы не "гонять" тестовые алгоритмы на слишком больших данных удобно менять разрешение снимков "на лету", что позволяет снизить количество обрабатываемых данных
- в ходе экспериментов (т.е. огрубить снимки и быстро прикинуть результат).</li>
-</ol>
-<h3>Вывод</h3>
-<p>Идеальный инструмент для этой задачи должен уметь:</p>
-<ol>
-<li>Обрабатывать десятки террабайт космоснимков.</li>
-<li>Организовывать удобную работу с отдельными каналами (растровую алгебру, аггрегирование и прочее).</li>
-<li>Считать зональные статистики.</li>
-<li>Позволять оптимизацию параметров.</li>
-<li>Стандартные ГИСовские штучки - перепроецирование, смена разрешения и прочие классические вещи.</li>
-<li>Возможность использования того или иного языка программирования, чтобы склеивать между собой различные этапы и для написания скриптов.</li>
-<li>(не обязательно, но желательно) Развитая библиотека уже готовых методов обработки, в частности классификаторов и оптимизаторов.</li>
-</ol>
-<h2>Работа в Google EarthEngine</h2>
-<p>GEE на первый взгляд устраивает всем, особенно подкупает то, что в нем из коробки организован доступ к данным ДЗЗ и не требуется предварительное выкачивание
-снимков. Также большое преимущество - скорость их обработки. Есть недостатки - лимиты на вычисления, в которые нет-нет, да и упираешься, в результате приходится
-придумывать обходные пути (но это условный недостаток, т.к. лимиты есть в любых условиях).</p>
-<p>Главная проблема GEE -- то, что у него очень ограничена возможность работы с зональной статистикой. GEE хранит данные у себя на серверах в виде тайлов 256x256 пикселей
-в итоге для того, чтобы посчитать зональную статистику есть два пути:</p>
-<ul>
-<li>использовать функцию ee.Image.reduceConnectedComponents(), но она может работать только с объектами (зонами), протяженностью не более 256 пикселей; все, что выше - будет сброшено
-в No-Data;</li>
-<li>если предыдуший вариант не устраивает, можно произвести векторизацию зон через функцию ee.Image.reduceToVectors() и считать статистики внутри векторных данных,
-однако на большом объеме пикселей эта функция не будет работать из-за нехватки памяти (приходится или уменьшать территорию, или снижать разрешение).</li>
-</ul>
-<p>Итак GEE - очень хороший кандидат, но в данном конкретном случае все портит проблема зональной статистики.</p>
-<h2>Связка TensorFlow и GEE</h2>
-<p>Конечно, немного странно писать тут про TensorFlow, поскольку TF предназначен для других целей. Но упоминаю о нем, т.к. модели TF можно использовать напрямую в GEE,
-что сильно расширяет возможности GEE (и частично снимает проблему зональных статистик на растрах).
-Обычно, конечно, в GEE подключается нейросетевая модель, обученная в TF, но никто не запрещает использовать и другие модели. В нашем случае TF
-хорош еще и тем, что в нем очень удобно производить оптимизацию параметров (собственно, для чего TF и создавался) -- очень распространенная задача в анализе ДЗЗ.</p>
-<p>Но при выносе требуемой нам модели на уровень TF возникают сложности, связанные с тем, что в TF очень неудобно работать с отдельными каналами и растрами. По большому счету все, с чем человек
-имеет дело при работе с TF - это многомерный массив. До тех пор, пока программисту не нужно обрабатывать отдельные измерения массива (в нашем случае - каналы) по специфическим
-схемам обработки, все будет хорошо, но как только требуется достучаться до отдельного канала, приходится писать что-то вроде <code>Image[:, :, band_number, ;, ....]</code> и код очень быстро
-замусовривается и становится нечитаемым.</p>
-<p>Бороться с подобным можно, создавая объекты-обертки и организуя в них доступ к отдельным срезам данных. Выглядит это как-то так:</p>
-<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">YamazakiModel</span><span class="p">:</span>
-  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene_count</span><span class="p">,</span> <span class="n">band_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;green&#39;</span><span class="p">,</span><span class="s1">&#39;red&#39;</span><span class="p">,</span><span class="s1">&#39;nir&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span><span class="s1">&#39;tir2&#39;</span><span class="p">]):</span>
-
-    <span class="bp">self</span><span class="o">.</span><span class="n">scene_count</span> <span class="o">=</span> <span class="n">scene_count</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">band_names</span> <span class="o">=</span> <span class="n">band_names</span>
-
-    <span class="bp">self</span><span class="o">.</span><span class="n">SCALE</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="mf">15.0</span><span class="p">)</span>
-<span class="o">...</span>   
-    <span class="c1"># Перечисляются параметры модели, которые нужно оптимизировать:</span>
-    <span class="c1"># NDLI PARAMS</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">NDLI_MIN</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">NDLI_MAX</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
-<span class="o">...</span>
-
-    <span class="c1"># Прописываются свойства доступа к отдельным каналам</span>
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">scene_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-      <span class="k">return</span> <span class="mi">1</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">band_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-      <span class="k">return</span> <span class="mi">2</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">green_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-      <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">band_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
-<span class="o">...</span>
-
-    <span class="c1"># Доступ каналам:</span>
-    <span class="k">def</span> <span class="nf">_band</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
-      <span class="k">return</span> <span class="n">sample</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">index</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
-
-    <span class="k">def</span> <span class="nf">green</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
-      <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_band</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">green_idx</span><span class="p">)</span>
-<span class="o">...</span>
-
-    <span class="c1"># Использование в самой модели</span>
-    <span class="k">def</span> <span class="nf">ndli</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
-      <span class="n">red</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">red</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
-      <span class="n">nir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nir</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
-      <span class="n">green</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">green</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
-      <span class="n">swir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">swir</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
-
-      <span class="n">gr</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">red</span><span class="p">,</span> <span class="n">green</span><span class="p">)</span>
-      <span class="n">ns</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">nir</span><span class="p">,</span> <span class="n">swir</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">f_ndli</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
-      <span class="n">ndli</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndli</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
-      <span class="n">k</span> <span class="o">=</span> <span class="mf">1.0</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NDLI_MIN</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">NDLI_MAX</span><span class="p">)</span>
-      <span class="n">b</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">NDLI_MAX</span> <span class="o">*</span>  <span class="n">k</span>
-      <span class="n">result</span> <span class="o">=</span> <span class="n">k</span> <span class="o">*</span> <span class="n">ndli</span> <span class="o">+</span> <span class="n">b</span>
-
-      <span class="n">result</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">);</span>
-      <span class="n">result</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">);</span>
-      <span class="k">return</span> <span class="n">result</span>
-<span class="o">...</span>
-</pre></div>
-
-
-<p>В конечном итоге за счет написания подобных оберток сам процесс подбора параметров становится более-менее комфортным. Но зато:</p>
-<ul>
-<li>оберточного кода нужно очень много, по сути приходится писать чуть ли не свою растровую ГИС, но только на массивах;</li>
-<li>оберточный код тоже довольно сложен: все более-менее прямолинейно до тех пор, пока не появляется свертка или аггрегация
- по одной из размерностей, в результате чего  меняется размерность массива и вся нумерация каналов летит к чертям.</li>
-</ul>
-<p>Выигрыш же от использования связки GEE+TF в этой задаче не очень большой -- тайловая архитектура никуда не девается. Правда,
-за счет внешнего кода мы можем играть размерами скользящего окна при обработке, но это не дает кардинального улучшения.</p>
-<p>Из прочих минусов - отсутствие типично ГИСовских операций типа поддержки проекций и растров с различным разрешением пикселя.</p>
-<h2>GRASS GIS</h2>
-<p>Еще один тестировавшийся вариант -- посчитать все на GRASS GIS. Плюсы очевидны:</p>
-<ul>
-<li>полноценная ГИС с развитым инструментарием (нет проблем ни с зональной статистикой, ни с преобразованиями);</li>
-<li>большие возможности скриптовой обработки;</li>
-<li>встроенные классификаторы и возможноть подключения внешних (например, того же TF).</li>
-</ul>
-<p>Минусы так же очевидны:</p>
-<ul>
-<li>неудобно работать с большими данными, например, для параллельной обработки приходится в явном виде разбивать территорию на части
- (правда, в из-за ограничений по памяти в GEE в конечном итоге также приходится бить территорию на куски);</li>
-<li>нужно хранить данные локально - огромный минус по сравнению с GEE, где получение данных происходит прозрачно для пользователя; в
- итоге нужно организовывать локальное хранилище данных и скачивать десятки террабайт снимков</li>
-<li>считаешь все на своем железе, от которого и зависит, хватит ли ресурсов на обработку.</li>
-</ul>
-<h2>Выводы</h2>
-<p>А выводов как таковых не будет, это скорее заметки на память по свежим следам.</p>
-<p>Можно лишь сказать, что пока проклевывается такое грубое правило -- если нет ограничений на используемое ПО, тогда</p>
-<ul>
-<li>если задача требует попискельного подхода, то лучшее ее решать в GEE;</li>
-<li>если нужно работать с небольшими окрестностями пикселей (грубо до 200 пикселей), то тоже работаем GEE, а при необходимости подключаем TF;</li>
-<li>если нужно аггрегировать данные в пространстве или работать с разнородными данными,
- тогда лучше играет связка GEE+GRASS - подготовка данных к анализу производится в GEE, затем экспорт полученных результатов и последующий анализ их в GRASS GIS.</li>
-</ul>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<li>Активная работа с различными каналами по различным формулам. Имеется …</li></ol>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/zamechaniia-po-organizatsii-obrabotki-rastrov.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
