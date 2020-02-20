@@ -18,110 +18,91 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/a-threshold-selection-method-from-gray-level-histograms.html">A threshold selection method from gray-level histograms</a></h1>
 <footer class="post-info">
-        <abbr class="published" title="2020-02-10T00:00:00+03:00">
-                Published: Пн 10 февраля 2020
+        <abbr class="published" title="2020-02-20T00:00:00+03:00">
+                Published: Чт 20 февраля 2020
         </abbr>
 
         <address class="vcard author">
                 By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/monitoring.html">Monitoring</a> <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> <a href="https://kolesovdmitry.github.io/logbook/tag/fire.html">Fire</a> <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-1.html">Sentinel-1</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи 
-<a href="https://www.nature.com/articles/s41598-019-56967-x.pdf">Y. Ban, P. Zhang, A. Nascetti, A. R. Bevington, and M. A. Wulder, “Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning”</a></strong></p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/raster-processing.html">Raster Processing</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор методов статьи 
+<a href="http://webserver2.tecgraf.puc-rio.br/~mgattass/cg/trbImg/Otsu.pdf">Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66</a></strong></p>
 <h2>О чем пойдет речь</h2>
-<p>Статья описывает методы мониторинга пожаров в режиме, близком к режиму реального времени на данных Сентинель-1. Радарная съемка позволяет
-мониторить территории не взирая на облачность и дымы (особенно актуально при мониторинге пожаров).</p>
-<p>Авторы используют сверточные сети и применяют их к анализу свежих изображений, полученных с Сентинель-1, и исторических данными Сентинелей (необходимых
-для оценки вариативности отраженного сигнала).</p>
-<p>Нас эта работа интересует как способ "подсмотреть" методы мониторинга и применить их к мониторингу лесоизменений в целом, а не только пожаров.</p>
-<h2>Исходные данные и результаты</h2>
-<p>Используется Sentinel-1, были построены временные ряды для поляризаций VV и HV, полученные в режиме IW. Территория, на которой производились работы, -
-нескольк площадей в США и Канаде. Оценка работы алгоритмов мониторинга производилась:</p>
-<ul>
-<li>на базе снимков сверхвысокого разрешения Worldview-3;</li>
-<li>снимков Sentinel-2;</li>
-<li>полевых работ.</li>
-</ul>
-<p>Для анализа выбирались несколько областей интереса, расположенных на лесных и не-лесных территориях и различных попографических условиях (высота, склоны и т.п.).
-По этим участкам собиралась статистика того, в каких дипазонах изменяется отраженный сигнал (средние, дисперсии), строились временные ряды сигналов до и после пожаров.
-Поскольку данные радарной съемки зависят от важности почвы и насыщенности растений влагой, то собиралась также информация о суточных атмосферных осадках. На рисунке показаны
-примеры временных рядов для сгоревших и не-сгоревших лесных (графики (a) и (c)) и травянистых участков (графики (b) и (d)).</p>
-<p><img alt="Графики временных рядов" src="images/2020-02-07/Figure1-1.png" title="Графики временных рядов" width="95%"></p>
-<p>Далее авторы приводят куски снимков, показывающих ход распространения пожаров и результаты классификации (пожар/не-пожар) полученные различными методами, начиная с простейших, и
-заканчивая сверточной сетью (logRt, kmap, CNN_*). Также приводится сводная таблица по качеству классификации, из которой видно, что по метрикам <span class="math">\(F_1\)</span> и Kappa сверточная сеть показывает наилучшие результаты.</p>
-<h2>Описание методики</h2>
-<p>Общая схема: как только приходит сигнал о пожаре, из архивной съемки поднимаются имеющиеся данные и составляются статистики по тому,
-как ведет себя отраженный сигнал в "естественных" условиях, т.е. до пожара. Затем производится мониторинг распространения пожара на базе
-сравнения вновь полученных сигналов и исторической съемки.</p>
-<p>Более детально:</p>
-<ul>
-<li>рассчитывается логарифм отношения изображений, полученных до пожара и после пожара;</li>
-<li>строится грубая бинарная маска сгоревших и не-сгоревших участков, для этого используются методы поиска аномалий во временных рядах;</li>
-<li>полученная маска используется в качестве обучающего множества для сверточной сети; сеть возвращает растры, описывающие "уверенность" сети
- в том, что пожар был;</li>
-<li>на последнем шаге строятся бинарные растры пожар/не-пожар на базе сравнения "уверенности" с автоматически вычисляемым порогом.</li>
-</ul>
-<p>Эта методикаа показана на следующем рисунке и подробно описывается ниже:</p>
-<p><img alt="Графики временных рядов" src="images/2020-02-07/Figure2.png" title="Графики временных рядов" width="95%"></p>
-<h3>Логарифм отношения</h3>
-<p>Выбирается снимок, предшествующий пожару: должен быть таким, чтобы эффекты сезонности были сведены к минимуму и в то же время это не должен быть снимок, полученный после сильного дождя.</p>
-<p>Затем для каждого снимка, полученного после начала пожара строится временной ряд логоарифма отношений:</p>
+<p>В статье авторы рассматривают изображение в градациях серого и задаются вопросом о том, как привести его к бинарному виду.
+Например, изображение может представлять собой результат классификации, когда "черные" пиксели относятся к одному классу, а "белые" к другому, и возникает вопрос,
+как автоматически провести границу между классами, т.е. как выбрать такой порог яркости, ниже которого пиксели будут
+считаться первым классом, а выше -- вторым.</p>
+<h2>Что предлагается</h2>
+<h3>Обозначения</h3>
+<p>Пусть <span class="math">\(L\)</span> - число возможных градаций серого на изображении ([1, 2, ..., <span class="math">\(L\)</span>]), <span class="math">\(n_i\)</span> -- число пикселей для каждой градации и  <span class="math">\(N=n_1, + \dots + n_L\)</span>.</p>
+<p>Пусть <span class="math">\(p_i = n_i/N\)</span> - частоты, с которыми встречаются соотвествующие яркости пикселей.</p>
+<p>Пусть <span class="math">\(k\)</span> -- граница между классами (искомый порог), тогда <span class="math">\(C_0\)</span> -- пиксели с яркостями не превышающими порога ([1, 2,... <span class="math">\(k\)</span>]), а <span class="math">\(C_1\)</span> -- пиксели с яркостями выше порога ([<span class="math">\(k+1\)</span>, ... <span class="math">\(L\)</span>]).</p>
+<h3>Логика рассуждений</h3>
+<p>Разобьем изображение на два класса в соответствии с порогом <span class="math">\(k\)</span>. Для пикселей каждого класса по отдельности мы можем расчитать частоту их встречаемости, а также выборочные средние и дисперсии.</p>
+<p>Частоты:
+</p>
 <div class="math">$$
-\Delta \beta_r = 10 \log_{10} \left ( \frac{\beta_r^m}{\beta_r^s} \right ),
+\omega_0(k) = \sum_{i=1}^k p_i,
+$$</div>
+<div class="math">$$
+\omega_1(k) = \sum_{i=k+1}^L p_i.
+$$</div>
+<p>Средние по классам:
+</p>
+<div class="math">$$
+\mu_0(k) = \sum_{i=1}^{k} i Pr(i| C_0),
+$$</div>
+<div class="math">$$
+\mu_1(k) = \sum_{i=k+1}^{L} i Pr(i| C_1).
 $$</div>
 <p>
-где <span class="math">\(r\in ASC_{-\mu}, DSC_{-\mu}\)</span> - индекс снимка, обозначает восходяющую или нисходящую орбиту и его относительный номер (<span class="math">\(\mu\)</span> <span class="math">\(\nu\)</span>), <span class="math">\(m\)</span> -- базовый снимок,
-полученный до начала пожара, с которым производится сравнение, а <span class="math">\(s\)</span> -- снимок полученный после начала пожара. Таким образом получаем временной ряд растров. Аналогичный временной
-ряд строится на основе сравнения базового снимка <span class="math">\(m\)</span> и снимков, полученных до начала пожара; этот временной ряд позволяет оценить вариативность данных в "нормальных" условиях.</p>
-<p>Далее для сокращения записи используется простое обозначение <span class="math">\(\Delta \beta\)</span> вместо <span class="math">\(\Delta \beta_r\)</span>.</p>
-<h3>Поиск аномалий</h3>
-<p>Основываясь на временном ряду снимков, предшествующих пожару, оценивается среднее и стандартное отклонение для логарифма отношений (в каждом пикселе свои статистики).
-Эти статистики вычисляются по всей области интересов отдельно для восходящей и нисходящей орбиты и поляризаций VH и VV:</p>
+Общее среднее:
+</p>
 <div class="math">$$
-\sigma(i,j)  = \sqrt{\frac{\Sigma_{t=1}^N (\beta^t(i,j) - \overline{\beta}(i,j))^2}{N-1}},
+\mu_1(k) = \sum_{i=1}^{L} i p_i.
 $$</div>
-<p>
-где <span class="math">\(\overline{\beta}(i,j)\)</span> - средний логарифм отношений в пикселе <span class="math">\((i,j)\)</span>, <span class="math">\(N\)</span> -- число доступных сцен для анализируемой орбиты и поляризации.</p>
-<p>Далее расчитывается величина kmap:</p>
+<p>Дисперсии
+</p>
 <div class="math">$$
-I_k(i,j) = \frac{|\Delta \beta(i,j)|}{\sigma(i.j)},
+\sigma_0(k) = \sum_{i=1}^{k}(i-\mu_0)  Pr(i| C_0),
 $$</div>
-<p>
-эта величина оценивает "неожиданность" соответствующего <span class="math">\(|\Delta \beta(i,j)|\)</span> -- чем она выше, тем более аномальным предтавляется отношение логарифмов.
-Пиксель относится к аномальным по превышении некоторого порога:</p>
 <div class="math">$$
-I(i,j) =\begin{cases} 1, \qquad I_k(i,j) \geq k_0 \\ 0, \qquad I_k(i,j) &lt; k_0  \end{cases},
+\sigma_1(k) = \sum_{i=k+1}^{L}(i-\mu_1)  Pr(i| C_1).
 $$</div>
-<p>
-авторы рекомендуют начать с <span class="math">\(k_0 = 2\)</span>.</p>
-<p>Полученный временной ряд бинарных масок является входном для следующего шага.</p>
-<h3>Сверточная сеть</h3>
-<p>Полученные на предыдущем этапе грубые оценки сгоревших участков используются для автоматического построения обучающего множества.</p>
-<p>Пробегая по всем доступным датам конструируется стек изображений из следуюих слоев:</p>
-<ul>
-<li>базовый снимок;</li>
-<li>текущий снимок;</li>
-<li>растр <span class="math">\(\sigma(i,j)\)</span>;</li>
-<li>данные по рельефу -- высоты, крутизна и экспозиция склонов.</li>
-</ul>
-<p>Случайным образом генерируются одинаковое число примеров сгоревших и не сгоревших участков. Бинарная маска аномалий, рассчитанная на предыдущем этапе,
-является маркером того, считать участок сгоревшим или нет.</p>
-<p>Далее обучается сверточная сеть, которая должна помечать сгоревшие области. Авторы описывают архитектуру своей сверточной сети без особых подробностей, но
-похоже, что это "ванильная" нейросеть: она настроена на классификацию, а не сегментацию (возвращает сгорело/не-сгорело для центрального пикселя участка из 55х55 пикселей).</p>
-<p>Но поскольку на выходе сети у авторов стоит сигмоидальная функция, то выходная величина -- не бинарная, а непрерывная. Полученный растр со значениями из диапазона (0, 1) авторы
-называют растром "уверенности" (confidence map).</p>
-<p>Опционально авторы предлагают использовать результаты обученной сети после первой итерации обучения для того, чтобы уточнить маску пожаров и на основе уточненной маски генерируются дополнительные обучающие примеры.</p>
-<h3>Построение бинарной маски и аггрегация временных рядов</h3>
-<p>Из нейросети выходит непрерывная величина, лежащая в диапазоне (0, 1). Авторы предлагают бинаризовать ее согласно процедуре выбора порога бинаризации Otsu [Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66, https://doi.org/10.1109/ TSMC.1979.4310076 (1979).]. <em>Признаться, я не знаю, что то за процедура, а авторы ее не описывают -- нужно будет заглянуть в первоисточник.</em></p>
-<p>Для того, чтобы построить куммулятивную маску пожаров авторы предлагают использовать два метода:</p>
-<ul>
-<li>быстрый способ состоит в том, чтобы объединить между собой все предыдущие маски;</li>
-<li>второй способ состоит из процедуры постобработки и использует созданные на текущий момент маски, согласно этому методу
-  временной ряд масок обрабатывается гаусовым фильтром во временной области; (<em>не совсем понятно -- гаусов фильтр выдаст опять-таки непрерывную величину, которую снова нужно будет бинаризовать... в чем выгода?</em>)</li>
-</ul>
+<p>Далее предлагается воспользоваться подходом, похожим на те, что используются в дискриминантном и кластерном анализах: нужно выбрать такую величину <span class="math">\(k\)</span>, которая позволит максимально отделить
+друг от друга классы <span class="math">\(C_0\)</span> и <span class="math">\(C_1\)</span>. Другими словами выбирать порог следует таким образом, чтобы внутриклассовая дисперсия была как можно меньше по сравнению с общей дисперсией или межклассовой дисперсией.</p>
+<p>Авторы рассматривают три критерия и показывают, что они эквивалентны между собой (для краткости записи опустим функциональную зависимоть дисперсий от <span class="math">\(k\)</span>):</p>
+<div class="math">$$
+\lambda(k) = \frac{\sigma^2_b}{\sigma^2_w} \to \max_{1\leq k \leq L},
+\qquad \kappa(k) = \frac{\sigma^2_t}{\sigma^2_w} \to \max_{1\leq k \leq L},
+\qquad \eta(k) = \frac{\sigma^2_b}{\sigma^2_t} \to \max_{1\leq k \leq L}, 
+$$</div>
+<p>где <span class="math">\(\sigma_b\)</span>, <span class="math">\(\sigma_w\)</span> и <span class="math">\(\sigma_t\)</span> -- соответственно межклассовая, внутриклассовая и общая дисперсии, которые можно вычислить по формулам (вывод формул опускаю):</p>
+<div class="math">$$
+\sigma^2_b = \omega_0\omega_1(\mu_1 - \mu_2)^2,
+$$</div>
+<div class="math">$$
+\sigma^2_w = \omega_0\sigma_0^2 + \omega_1\sigma_1^2,
+$$</div>
+<div class="math">$$
+\sigma^2_t = \sum_{i=1}^L (i-\mu_t)^2.
+$$</div>
+<p>Авторы показывают, что задача поиска максимума по данным критериям в конечном итоге эквивалентна задаче максимизации величины <span class="math">\(\sigma_b\)</span> и, таким образом,
+оптимальный порог <span class="math">\(k\)</span> должен быть выбран таким, чтобы он давал максимум величины <span class="math">\(\sigma_b\)</span>.</p>
+<h2>Несколько замечаний</h2>
+<p>Данный подход выглядит интересным, но он подразумевает, что на изображении присутствуют пиксели двух классов, другими словами, он будет хорошо работать в случае бимодальной
+функции распределения яркостей пикселей изображения. (Авторы приводят способ расширить подход на несколько классов, а также дают пример бинаризации изображения с унимодальной функцией распределения
+яркостей, но все же, все же...)</p>
+<p>Поэтому у меня есть некоторые сомнения, о том, насколько хорошо ляжет данный подход на наши задачи. Вообще задача бинаризации растровых изображений у нас возникает часто,
+но на данную статью я наткнулся, разбирая <a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">работу по мониторингу пожаров</a>. В задаче мониторинга предлагаемый подход должен сработать
+по организации эксперимента -- там мониторятся заведомо изменившиеся участки и на изображении будут заведомо присуствовать два класса (гарь/не-гарь).</p>
+<p>В нашем же случае мониторинга лесоизменений ситуация чуть сложнее -- мы мониторим участки, которые (а) могут вообще не менятся (б) на них могут присутвовать различные естественные изменения (например, листопады).
+Поэтому данный подход может "сбоить" в наших условиях. Но тем не менее, его обязательно нужно попробовать, т.к. даже если он и будет требовать ручной доводки оператором, все равно полуавтоматический
+выбор пороговой дает какую-то отправную точку для дальнейшего поиска оптимальной величины.</p>
 <script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
@@ -189,6 +170,31 @@ $$</div>
                     <h1>Other articles</h1>
                     <hr />
                     <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html" rel="bookmark"
+                           title="Permalink to Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning">Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2020-02-10T00:00:00+03:00">
+                Published: Пн 10 февраля 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/monitoring.html">Monitoring</a> <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> <a href="https://kolesovdmitry.github.io/logbook/tag/fire.html">Fire</a> <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-1.html">Sentinel-1</a> </p>
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи 
+<a href="https://www.nature.com/articles/s41598-019-56967-x.pdf">Y. Ban, P. Zhang, A. Nascetti, A. R. Bevington, and M. A. Wulder, “Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning”</a></strong></p>
+<h2>О чем пойдет речь</h2>
+<p>Статья описывает методы мониторинга пожаров в режиме, близком к режиму реального времени на данных Сентинель-1. Радарная …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
@@ -404,34 +410,11 @@ $$</div>
                 <a class="readmore" href="https://kolesovdmitry.github.io/logbook/patterns-of-snow-leopard-site-use-in-an-increasingly-human-dominated-landscape.html">read more</a>
                 </div><!-- /.entry-content -->
             </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/estimating-occupancy-using-spatially-and-temporally-replicated-snow-surveys.html" rel="bookmark"
-                           title="Permalink to Estimating occupancy using spatially and temporally replicated snow surveys">Estimating occupancy using spatially and temporally replicated snow surveys</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-03T00:00:00+03:00">
-                Published: Вт 03 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи 
-<a href="https://zslpublications.onlinelibrary.wiley.com/doi/abs/10.1111/acv.12140">J. Whittington, K. Heuer, B. Hunt, M. Hebblewhite, and P. M. Lukacs, 
-“Estimating occupancy using spatially and temporally replicated snow surveys: Estimating occupancy by snow surveys,” 
-Anim Conserv, vol. 18, no. 1, pp. 92–101, Feb. 2015.</a></strong></p>
-<h2>Суть задачи</h2>
-<p>Нужно разработать методику подсчета числа особей определенных …</p>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/estimating-occupancy-using-spatially-and-temporally-replicated-snow-surveys.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
                 </ol><!-- /#posts-list -->
+<p class="paginator">
+    Page 1 / 2
+        <a href="https://kolesovdmitry.github.io/logbook/index2.html">&raquo;</a>
+</p>
                 </section><!-- /#content -->
         <section id="extras" class="body">
         </section><!-- /#extras -->
