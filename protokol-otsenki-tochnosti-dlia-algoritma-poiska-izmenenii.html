@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
         <meta charset="utf-8" />
-        <title>Список всего - Change Detection</title>
+        <title>Протокол оценки точности для алгоритма поиска изменений</title>
         <link rel="stylesheet" href="https://kolesovdmitry.github.io/logbook/theme/css/main.css" />
 </head>
 
@@ -10,16 +10,21 @@
         <header id="banner" class="body">
                 <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
                 <nav><ul>
-                    <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection-accuracy.html">Change Detection, Accuracy</a></li>
+                    <li class="active"><a href="https://kolesovdmitry.github.io/logbook/category/change-detection-accuracy.html">Change Detection, Accuracy</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
                 </ul></nav>
         </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="https://kolesovdmitry.github.io/logbook/protokol-otsenki-tochnosti-dlia-algoritma-poiska-izmenenii.html" rel="bookmark"
+           title="Permalink to Протокол оценки точности для алгоритма поиска изменений">Протокол оценки точности для алгоритма поиска изменений</a></h1>
+    </header>
 
-            <aside id="featured" class="body">
-                <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/protokol-otsenki-tochnosti-dlia-algoritma-poiska-izmenenii.html">Протокол оценки точности для алгоритма поиска изменений</a></h1>
+    <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-03-11T00:00:00+03:00">
                 Published: Ср 11 марта 2020
@@ -30,7 +35,7 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/change-detection-accuracy.html">Change Detection, Accuracy</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> </p>
-</footer><!-- /.post-info --><p>Здесь записано несколько мыслей, которые приходят в голову при прочтении работы, посвященной протоколу оценки точности для задачи детекции изменений
+</footer><!-- /.post-info -->      <p>Здесь записано несколько мыслей, которые приходят в голову при прочтении работы, посвященной протоколу оценки точности для задачи детекции изменений
 P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wulder, "Good practices for estimating area and assessing accuracy of land change", Remote Sensing of Environment, vol. 148, pp. 42–57  (<a href="http://eprints.nottingham.ac.uk/44846/1/Olofsson_good%20practices.pdf">в сети есть препринт статьи</a>).</p>
 <p>Вообще при прочтении таких работ обычно ждешь конкретики (все-же протокол предлагается), и каждый раз удивляешься тому, что авторы подробно расписывают очевидные вещи и при этом
 избегают давать каких-либо конкретные рекомендации. Тем не менее, не смотря на недостаточную конкретность,
@@ -73,39 +78,11 @@ P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wu
 <h2>6. Частота мониторинга</h2>
 <p>Ситуацию усложняет то, что наша система работает круглый год и мы ожидаем, что точность ее работы должна зависеть от сезона:
 детекция лесоизменений по летним данным должна давать погрешность, отличную от детекции по зимним данным или данным, полученным в межсезонье.</p>
-<p>Это приводит к тому, что нужно производить оценку несколько раз для разных времен года.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>Это приводит к тому, что нужно производить оценку несколько раз для разных времен года.</p>
+    </div><!-- /.entry-content -->
 
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html" rel="bookmark"
-                           title="Permalink to Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning">Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2020-02-10T00:00:00+03:00">
-                Published: Пн 10 февраля 2020
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/monitoring.html">Monitoring</a> <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> <a href="https://kolesovdmitry.github.io/logbook/tag/fire.html">Fire</a> <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-1.html">Sentinel-1</a> </p>
-</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи 
-<a href="https://www.nature.com/articles/s41598-019-56967-x.pdf">Y. Ban, P. Zhang, A. Nascetti, A. R. Bevington, and M. A. Wulder, “Near Real-Time Wildfire Progression Monitoring with Sentinel-1 SAR Time Series and Deep Learning”</a></strong></p>
-<h2>О чем пойдет речь</h2>
-<p>Статья описывает методы мониторинга пожаров в режиме, близком к режиму реального времени на данных Сентинель-1. Радарная …</p>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-                </ol><!-- /#posts-list -->
-                </section><!-- /#content -->
+  </article>
+</section>
         <section id="extras" class="body">
         </section><!-- /#extras -->
 

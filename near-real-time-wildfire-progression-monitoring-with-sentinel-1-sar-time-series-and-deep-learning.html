@@ -10,6 +10,7 @@
         <header id="banner" class="body">
                 <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
                 <nav><ul>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection-accuracy.html">Change Detection, Accuracy</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
                     <li class="active"><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
@@ -120,7 +121,7 @@ $$</div>
 называют растром "уверенности" (confidence map).</p>
 <p>Опционально авторы предлагают использовать результаты обученной сети после первой итерации обучения для того, чтобы уточнить маску пожаров и на основе уточненной маски генерируются дополнительные обучающие примеры.</p>
 <h3>Построение бинарной маски и аггрегация временных рядов</h3>
-<p>Из нейросети выходит непрерывная величина, лежащая в диапазоне (0, 1). Авторы предлагают бинаризовать ее согласно процедуре выбора порога бинаризации Otsu [Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66, https://doi.org/10.1109/ TSMC.1979.4310076 (1979).]. (См. <a href="https://kolesovdmitry.github.io/logbook/a-threshold-selection-method-from-gray-level-histograms.html">краткое описание</a>)</p>
+<p>Из нейросети выходит непрерывная величина, лежащая в диапазоне (0, 1). Авторы предлагают бинаризовать ее согласно процедуре выбора порога бинаризации Otsu [Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66, https://doi.org/10.1109/ TSMC.1979.4310076 (1979).]. (См. <a href="{filename}/2020-02-2-Image-Binarization.md">краткое описание</a>)</p>
 <p>Для того, чтобы построить куммулятивную маску пожаров авторы предлагают использовать два метода:</p>
 <ul>
 <li>быстрый способ состоит в том, чтобы объединить между собой все предыдущие маски;</li>
