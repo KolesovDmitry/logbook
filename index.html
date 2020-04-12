@@ -12,6 +12,7 @@
                 <nav><ul>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection.html">Change Detection</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
                 </ul></nav>
@@ -19,7 +20,247 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/protokol-otsenki-tochnosti-dlia-algoritma-poiska-izmenenii.html">Протокол оценки точности для алгоритма поиска изменений</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html">Ппример процедуры сегментации космосьемки сверточной сетью</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-04-11T00:00:00+03:00">
+                Published: Сб 11 апреля 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
+</footer><!-- /.post-info --><p>Цель создания этого документа -- описать полную цепочку сегментации космоснимков от генерирования обучающих примеров и обучения нейросети до использования полученной сети.
+В качестве демонстрационого примера выбрана задача поиска водных объектов, в качестве используемой сети -- UNet.</p>
+<p>Для примера исходных данных, с которыми будем работать, возмем подготовленные ранее медианные композиты Сентинель-2, искать на них будем маску водных объектов.
+Наша задача -- восстановить маску при помощи нейросети.</p>
+<p>Работа будет строиться по следующей схеме:</p>
+<ol>
+<li>Создание обучающей выборки.</li>
+<li>Построение нейросети.</li>
+<li>Обучение нейросети.</li>
+<li>Использование обученной сети.</li>
+</ol>
+<h1>Построение обучающей выборки</h1>
+<p>Для обучения сети нам потребуются примеры входных снимков и известных ответов. </p>
+<p>Обучающие данные сгенерируем в GRASS GIS и выгрузим в виде набора отдельных файлов формата GeoTIFF. Предполагается, что данные Сентинель-2 и маска водных объектов
+уже загружена в БД GRASS. В реальной жизни у нас не будет готовой маски, а будут лишь отдельные отрисованные примеры. Чтобы имитировать этот случай сгенерируем
+несколько случайных точек, а затем вырежем из космоснимков участки вокруг точек. Полученные участки будем использовать как обучающие.</p>
+<p>Проведем подготовительную работу: сгенерируем точки, объединим отдельные каналы снимков в одну группу:</p>
+<div class="highlight"><pre><span></span>GRASS&gt; v.random <span class="nv">out</span><span class="o">=</span>pts <span class="nv">np</span><span class="o">=</span><span class="m">5000</span> <span class="nv">restrict</span><span class="o">=</span>AOI
+GRASS&gt; v.db.addtable pts <span class="nv">col</span><span class="o">=</span><span class="s2">&quot;land int&quot;</span>
+GRASS&gt; v.what.rast pts <span class="nv">rast</span><span class="o">=</span>water <span class="nv">col</span><span class="o">=</span>land
+
+GRASS&gt; i.group <span class="nv">group</span><span class="o">=</span>may18 <span class="nv">input</span><span class="o">=</span><span class="s2">&quot;may18.green,may18.ndli,may18.ndvi,may18.ndwi,may18.nir,may18.red,may18.swir,may18.tir&quot;</span>
+</pre></div>
+
+
+<p>Построим вокруг каждой точки буфер размеров в 32 пикселя и экспортируем данные в виде отдельного изображения в формате GeoTIFF.
+Отметим, что число пикселей в тайле (32) взято для примера, и можно использовать другие варианты. Более того, далее мы создадим нейросеть, которая может
+обучаться на различных размерах тайлов.</p>
+<div class="highlight"><pre><span></span><span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">raster</span><span class="o">=</span><span class="s1">&#39;may18.green&#39;</span><span class="p">)</span>
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">region</span> <span class="o">=</span> <span class="n">gscript</span><span class="o">.</span><span class="n">parse_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;g&#39;</span><span class="p">)</span>
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">resolution</span> <span class="o">=</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;ewres&#39;</span><span class="p">]</span>
+
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">PIXELS</span> <span class="o">=</span> <span class="mi">16</span>
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">DELTA</span> <span class="o">=</span> <span class="n">PIXELS</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">resolution</span><span class="p">)</span>
+
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">points</span> <span class="o">=</span> <span class="n">gscript</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.out.ascii&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;pts&#39;</span><span class="p">)</span>
+<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="o">.</span><span class="n">split</span><span class="p">():</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">cat</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
+    <span class="n">n</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="n">lat</span> <span class="o">+</span> <span class="n">DELTA</span><span class="p">,</span> <span class="n">lat</span> <span class="o">-</span> <span class="n">DELTA</span>
+    <span class="n">w</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="n">lon</span> <span class="o">-</span> <span class="n">DELTA</span><span class="p">,</span> <span class="n">lon</span> <span class="o">+</span> <span class="n">DELTA</span>
+    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="n">s</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="n">e</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;p&#39;</span><span class="p">)</span>
+    <span class="n">outname</span> <span class="o">=</span> <span class="s1">&#39;may_18_&#39;</span> <span class="o">+</span> <span class="n">cat</span> <span class="o">+</span> <span class="s1">&#39;.tif&#39;</span>
+    <span class="n">water_name</span> <span class="o">=</span> <span class="s1">&#39;water_&#39;</span> <span class="o">+</span> <span class="n">cat</span> <span class="o">+</span> <span class="s1">&#39;.tif&#39;</span>
+    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;r.out.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;may18&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">outname</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;cm&#39;</span><span class="p">)</span>
+    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;r.out.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;water&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">water_name</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;cm&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Данный код генерирует 5000 тайлов на базе снимка Сентинель-2 и маски воды, которые называются may_18_NUM.tif и water_NUM.tif соответвенно.</p>
+<h1>Создание нейросети</h1>
+<p>Создадим нейросеть воспользовавшись фреймворком TensorFlow. В качестве примера создадим Unet, состоящую всего из пары слоев в каждом направлении (кодировщика и декодировщика).</p>
+<p>Поскольку у нас маска воды состоит из двух классов (вода/не-вода), то можно рассматривать задачу как задачу регрессии, а не классификации. Поэтому при создании
+сети на выходной слой поставим функцию активации "гиперболический тангенс", которая ограничивает выход сети в диапазоне от -1 до 1, а для 
+функции потерь возьмем обычную среднеквадратичную разаность.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">layers</span>
+<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">losses</span>
+<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">models</span>
+<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">metrics</span>
+<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">optimizers</span>
+
+
+<span class="k">def</span> <span class="nf">conv_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">input_tensor</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">encoder</span>
+
+<span class="k">def</span> <span class="nf">encoder_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">conv_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">)</span>
+    <span class="n">encoder_pool</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">MaxPooling2D</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">strides</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))(</span><span class="n">encoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">encoder_pool</span><span class="p">,</span> <span class="n">encoder</span>
+
+<span class="k">def</span> <span class="nf">decoder_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">concat_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2DTranspose</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">strides</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">input_tensor</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">concat_tensor</span><span class="p">,</span> <span class="n">decoder</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">decoder</span>
+
+
+<span class="k">def</span> <span class="nf">get_model</span><span class="p">(</span><span class="n">band_count</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="s1">&#39;MeanSquaredError&#39;</span><span class="p">,</span> <span class="n">show_metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;RootMeanSquaredError&#39;</span><span class="p">]):</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">band_count</span><span class="p">])</span> <span class="c1"># 32x32</span>
+    <span class="n">encoder0_pool</span><span class="p">,</span> <span class="n">encoder0</span> <span class="o">=</span> <span class="n">encoder_block</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span> <span class="c1"># 16x16</span>
+    <span class="n">encoder1_pool</span><span class="p">,</span> <span class="n">encoder1</span> <span class="o">=</span> <span class="n">encoder_block</span><span class="p">(</span><span class="n">encoder0_pool</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span> <span class="c1"># 8x8</span>
+    <span class="n">center</span> <span class="o">=</span> <span class="n">conv_block</span><span class="p">(</span><span class="n">encoder1_pool</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span> <span class="c1"># center</span>
+    <span class="n">decoder1</span> <span class="o">=</span> <span class="n">decoder_block</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="n">encoder1</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span> <span class="c1"># 16</span>
+    <span class="n">decoder0</span> <span class="o">=</span> <span class="n">decoder_block</span><span class="p">(</span><span class="n">decoder1</span><span class="p">,</span> <span class="n">encoder0</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span> <span class="c1"># 32</span>
+    <span class="n">outputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;tanh&#39;</span><span class="p">)(</span><span class="n">decoder0</span><span class="p">)</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">inputs</span><span class="p">],</span> <span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">outputs</span><span class="p">])</span>
+
+    <span class="n">opt</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">optimizers</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">)</span>
+
+    <span class="n">model</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="c1"># optimizers.get(optimizer), </span>
+        <span class="n">loss</span><span class="o">=</span><span class="n">losses</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">loss</span><span class="p">),</span>
+        <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">show_metrics</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">model</span>
+</pre></div>
+
+
+<p>Основная функция здесь  -- get_model, она принимает на вход набор параметров сети (основной - число каналов снимка) и параметры оптимизатора.
+Внутри функции стоит обратить внимание на первую строку</p>
+<div class="highlight"><pre><span></span>    <span class="n">inputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">band_count</span><span class="p">])</span> <span class="c1"># 32x32</span>
+</pre></div>
+
+
+<p>Эта строка задает размерность входного изображения. С одной стороны мы генерировали тайлы размером 32x32 пикселя и можно было бы прописать
+размеры этих тайлов в параметре shape, но нас интересует обработка больших по объему снимков, поэтому мы не будем указывать размерность входных
+данных, что позволит нам при использовании сети подавать на вход другие размеры снимков.</p>
+<p>Это иллюстративный пример, тем не менее данную функцию легко модифицировать под свою задачу, например, можно изменить число слоев или задать иные метрики.</p>
+<h1>Обучение сети</h1>
+<p>Для обучения сети прочитаем сгенерированные тайлы и запустим процесс настройки параметров:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_sample_image</span><span class="p">(</span><span class="n">num</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;may_18_</span><span class="si">%s</span><span class="s1">.tif&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="p">))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>   
+    <span class="n">x</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">7</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">30</span>      <span class="c1"># &quot;Нормализация&quot;</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;water_</span><span class="si">%s</span><span class="s1">.tif&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="p">))</span> <span class="o">-</span> <span class="mf">1.0</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">get_data</span><span class="p">(</span><span class="n">num</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num</span><span class="p">):</span>
+        <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="n">get_sample_image</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">x</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+        <span class="n">y</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">get_data</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
+
+<span class="n">m</span> <span class="o">=</span> <span class="n">get_model</span><span class="p">()</span>
+<span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.67</span><span class="p">)</span>
+
+<span class="n">m</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;saved_model/model_100&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Здесь функция get_sample_image считывает обучающую пару изображений под номером num, а функция get_data генерирует обучающее множество целиком.
+В функции чтения данных нужно обратить внимание на следующую пару строк:</p>
+<ul>
+<li>первая строка x = np.nan_to_num(x) производит замену всех NaN на нули: дело
+в том, что в реальных снимках часть пикселей на изображении может отсуствовать и лучше обработать этот вариант заранее, заменив такие пиксели.</li>
+<li>второе замечание касается нормализации данных: x[:, :, 7] /= 30 Эта строка специфична для конкретного набора данных: все каналы используемого нами изображения
+лежат в диапазоне от -1 до 1, но последний канал хранит температуру, которая может изменяться в более широких пределах. 
+Поэтому и производится деление на 30 градусов, чтобы все каналы были приблизительно одинаковы по своему размаху.</li>
+</ul>
+<p>Собственно обучение производится одной строкой:</p>
+<div class="highlight"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.67</span><span class="p">)</span>
+</pre></div>
+
+
+<p>При этом происходит разбиение обучающего множетва на две части - рабочее, на котором происходит собственно обучение, и вадидационное, на котором тестируется качество сети.
+При обучении функция fit выводит на экран значение метрик качества для рабочего и валидационного множества. На последнем шаге модель сохраняется на диск.</p>
+<h1>Использование сети</h1>
+<p>После того, как сеть будет обучена, ее можно применить для классификации изображения. Для этого экспортируем исходные данные для анализа (изображение may.tif),
+прочитаем сохраненную сеть и применим ее к изображению:</p>
+<div class="highlight"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s1">&#39;saved_model/model_100&#39;</span><span class="p">)</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;may.tif&#39;</span><span class="p">)</span>  <span class="c1"># Экспортированный файл</span>
+<span class="n">data</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">7</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">30</span>            <span class="c1"># Нормирование (не забудьте, как обучали!)</span>
+<span class="n">data1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:],])</span>  <span class="c1"># См. раздел &quot;подводные камни&quot;</span>
+
+<span class="n">answ</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">data1</span><span class="p">)</span>
+<span class="n">tiff</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s1">&#39;res.tif&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">answ</span><span class="p">)</span>
+</pre></div>
+
+
+<p>На этом этапе у нас есть изображение с res.tif, в котором хранится полученный ответ нейросети. Пример исходного изображения для анализа (восьмиканальный GeoTIFF 'may') и результат
+работы сети показан ниже.</p>
+<p>Исходное изображение для анализа:
+<img alt="Source image" src="images/2020-04-10/may.png" title="Исходное изображение" width="90%"></p>
+<p>Результат работы нейросети:
+<img alt="answer image" src="images/2020-04-10/answer.png" title="Результат" width="90%"></p>
+<p>Обратите внимание на "дырку" в середине результирующего изображения. Она связана с тем, что тепловой канал, который использовался в качестве входных данных, содержал точно такую же "дыру",
+и она "прожглась" в ответе.</p>
+<h2>Подводные ками</h2>
+<h3>Этап вычислений</h3>
+<p>При обработке снимка наша модель дважды снижает размер изображения (см. функцию encoder_block и ее вызов в модели) на этапе кодировки. Затем, на этапе декодирования
+производится склеивание двух растров - полученного с этапа кодирования и расскодированного (см. layers.concatenate([concat_tensor, decoder) в функции decoder_block).</p>
+<p>Если на этапе кодирования подать на вход нечетное число пикселей в растре, то затем при декодировании возникнет ошибка "Dimensions of inputs should match", т.к. при 
+декодировании будут склеиваться различные по размеру растры. Чтобы такого не происходило, проще всего отрезать часть изображения таким образом, чтобы оно без остатка 
+делилось на четыре (два раза по два): такое изображение сначала может безболезненно уменьшится в четыре раза, а затем восстановиться обратно. Этим соображением и
+объясняется появление строки "data1 = np.array([data[:-1, :-1, :],])" в коде:</p>
+<div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+<span class="p">(</span><span class="mi">1914</span><span class="p">,</span> <span class="mi">3135</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+
+<span class="o">&gt;</span> <span class="n">data1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="p">:],])</span>
+<span class="o">&gt;</span> <span class="n">data1</span><span class="o">.</span><span class="n">shape</span>
+<span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1912</span><span class="p">,</span> <span class="mi">3132</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+</pre></div>
+
+
+<h3>Этап использования</h3>
+<p>Естественно, что TensorFlow ничего не знает о географических прявязках и системах координат. Поэтому результирующее изображение теряет информацию о положении снимка в пространстве.
+Простым способом восстановить информацию о координатах -- скопировать ее из исходного снимка:</p>
+<div class="highlight"><pre><span></span>&gt; gdalcopyproj.py may.tif res.tif
+</pre></div>
+
+
+<p>В результате растр res.tif можно будет использовать в ГИСах.</p>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/protokol-otsenki-tochnosti-dlia-algoritma-poiska-izmenenii.html" rel="bookmark"
+                           title="Permalink to Протокол оценки точности для алгоритма поиска изменений">Протокол оценки точности для алгоритма поиска изменений</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-03-11T00:00:00+03:00">
                 Published: Ср 11 марта 2020
@@ -30,55 +271,11 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/change-detection.html">Change Detection</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/change-detection.html">Change Detection</a> <a href="https://kolesovdmitry.github.io/logbook/tag/accuracy.html">Accuracy</a> </p>
-</footer><!-- /.post-info --><p>Здесь записано несколько мыслей, которые приходят в голову при прочтении работы, посвященной протоколу оценки точности для задачи детекции изменений
-P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wulder, "Good practices for estimating area and assessing accuracy of land change", Remote Sensing of Environment, vol. 148, pp. 42–57  (<a href="http://eprints.nottingham.ac.uk/44846/1/Olofsson_good%20practices.pdf">в сети есть препринт статьи</a>).</p>
-<p>Вообще при прочтении таких работ обычно ждешь конкретики (все-же протокол предлагается), и каждый раз удивляешься тому, что авторы подробно расписывают очевидные вещи и при этом
-избегают давать каких-либо конкретные рекомендации. Тем не менее, не смотря на недостаточную конкретность,
-эту работу я все-таки рекомендовал бы к прочтению - она задает несколько направлений, которые необходимо прояснить для себя прежде, чем
-браться за систематическую оценку точности.</p>
-<p>Итак, ниже фиксируются некоторые положения, которые требуют уточнений до начала работ по оценке точности нашей системы.</p>
-<h2>1. С какими данными сравниваем результаты</h2>
-<p>Карты изменений нужно сравнивать с какой-то справочной картой, которая принимается за истинное положение дел. </p>
-<p>В нашем случае все довольно очевидно - в качестве справочника берем Sentinel-2 за соотвествующий период и используем эти снимки для сравнения с построенными картами изменений.
-(У Сентинеля пространственное и временное разрешение выше, чем у источников, по которым строятся наши карты изменений; на настоящий момент нас это устраивает)</p>
-<p>Что делать, когда  при поиске изменений мы будем анализировать не Landsat, а Sentinel-2 - вопрос открытый, об этом нужно будет думать отдельно.</p>
-<h2>2. Организация выборки</h2>
-<p>Основные решения, которые требуется принять в нашем случае:</p>
-<ul>
-<li>выбор основной единицы проверки -- пиксель/полигон;</li>
-<li>принцип построения выборки -- равновероятная выборка/стратифицированная выборка/систематическая выборка;</li>
-</ul>
-<p>Авторы цитируемой работы предлагают (как один из вариантов) использовать случайную попиксельную выборку из классов полученной карты изменений. В работе
-предлагаются и другие варианты, но этот обсуждается как один из основных.</p>
-<p>В нашем случае это означает: берем (а) найденные лесоизменения и (б) стабильный лес, затем генерируем выборку из этих классов и проверяем, действительно ли
-пиксели выборки были классифицированы верно.</p>
-<p>К сожалению, такой подход у нас может не сработать, т.к. в нашем случае мониторинг ведется с периодом две недели, а за две недели почти не происходит интересующих нас изменений,
-поэтому почти все пиксели будут отнесены к классу стабильных. В итоге, в случае, если алгоритм сильно ошибается в сторону пропусков изменений,
-и почти не ошибается в сторону приписок, то вычисленная точность получится неплохой, даже если былы пропущены почти все изменения на территории.</p>
-<p>Таким образом сейчас я склоняюсь к тому, что нужно устраивать площадные проверки -- генерировать случайные квадраты (сколько? какой площади?) на них находить изменения (вручную) и затем сравнивать
-полученные полигоны изменений с теми, которые выдал алгоритм. Так мы получаем гораздо больше работы, но зато и на выходе будет более качественная оценка.</p>
-<h2>3. Различие в размерах пикселей</h2>
-<p>Разрешение карт изменений ниже, чем разрешение данных, по которым мы должны оценивать качество детекции. В результате один пиксель с карты
-изменений будет покрывать сразу несколько пикселей справочного растра, а эти справочные пиксели (возможно) будет принадлежать разным классам.</p>
-<p>Видимо, нужно оценивать не количество угаданных/не угаданных пикселей, а сначала векторизовать полигоны изменений, и затем вычислять площади пересечения полигонов,
-полученных алгоритмом детекции, и полигонов, полученных из справочного растра.</p>
-<h2>4. Геопривязка</h2>
-<p>Данные для анализа и справочные данные получены из разных источников (Landsat/Sentinel),
-при этом можно попасться на том, что Landsat'ы и Sentinel'и могут "не биться" пространтвенно: в данных может гулять геопривязка, это особенно актуально для горных районов. Соотвественно, отношение пересекающихся
-площадей полигонов к общей площади площадей тоже может гулять. По-хорошему нужно оценить точность привязки растров относительно друг друга прежде, чем считать точность детекции.</p>
-<h2>5. Метрика точности</h2>
-<p>До прочтения статьи я планировал использовать метрику Kappa, но авторы довольно сильно ее раскритиковали. К сожалению, они толком ничего не предложили взамен:
-практически для каждой альтернативы, которую обсуждали авторы, можно повторить те же самые возражения, и эти возражения будут также справедливы для альтернатив, как и для Каппы.</p>
-<p>Короче говоря -- нужно будет посмотреть, какие еще метрики точности можно использовать.</p>
-<h2>6. Частота мониторинга</h2>
-<p>Ситуацию усложняет то, что наша система работает круглый год и мы ожидаем, что точность ее работы должна зависеть от сезона:
-детекция лесоизменений по летним данным должна давать погрешность, отличную от детекции по зимним данным или данным, полученным в межсезонье.</p>
-<p>Это приводит к тому, что нужно производить оценку несколько раз для разных времен года.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+</footer><!-- /.post-info -->                <p>Здесь записано несколько мыслей, которые приходят в голову при прочтении работы, посвященной протоколу оценки точности для задачи детекции изменений
+P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wulder, "Good practices for estimating area and assessing accuracy of land change", Remote Sensing of …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/protokol-otsenki-tochnosti-dlia-algoritma-poiska-izmenenii.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
@@ -288,35 +485,6 @@ P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wu
 <ul>
 <li>удалить с них облака …</li></ul>
                 <a class="readmore" href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html" rel="bookmark"
-                           title="Permalink to Tigers on trails: occupancy modeling for cluster sampling">Tigers on trails: occupancy modeling for cluster sampling</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-09T00:00:00+03:00">
-                Published: Пн 09 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи
-<a href="https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1890/09-0321.1">Tigers on trails: occupancy modeling for cluster sampling</a></strong></p>
-<h2>Суть задачи</h2>
-<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. При этом ожидается, что данные по следам
-присутсвия животных:</p>
-<ul>
-<li>локально зависимы (более точно -- подчиняются Марковскому закону);</li>
-<li>собраны не случайным образом, а следуют из необходимости соблюдать компромис …</li></ul>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">read more</a>
                 </div><!-- /.entry-content -->
             </article></li>
                 </ol><!-- /#posts-list -->

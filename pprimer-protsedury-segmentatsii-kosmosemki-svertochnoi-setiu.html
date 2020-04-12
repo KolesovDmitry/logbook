@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
         <meta charset="utf-8" />
-        <title>Список всего - Water</title>
+        <title>Ппример процедуры сегментации космосьемки сверточной сетью</title>
         <link rel="stylesheet" href="https://kolesovdmitry.github.io/logbook/theme/css/main.css" />
 </head>
 
@@ -12,15 +12,20 @@
                 <nav><ul>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection.html">Change Detection</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
-                    <li><a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a></li>
+                    <li class="active"><a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
                 </ul></nav>
         </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html" rel="bookmark"
+           title="Permalink to Ппример процедуры сегментации космосьемки сверточной сетью">Ппример процедуры сегментации космосьемки сверточной сетью</a></h1>
+    </header>
 
-            <aside id="featured" class="body">
-                <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html">Ппример процедуры сегментации космосьемки сверточной сетью</a></h1>
+    <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-04-11T00:00:00+03:00">
                 Published: Сб 11 апреля 2020
@@ -31,7 +36,7 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
-</footer><!-- /.post-info --><p>Цель создания этого документа -- описать полную цепочку сегментации космоснимков от генерирования обучающих примеров и обучения нейросети до использования полученной сети.
+</footer><!-- /.post-info -->      <p>Цель создания этого документа -- описать полную цепочку сегментации космоснимков от генерирования обучающих примеров и обучения нейросети до использования полученной сети.
 В качестве демонстрационого примера выбрана задача поиска водных объектов, в качестве используемой сети -- UNet.</p>
 <p>Для примера исходных данных, с которыми будем работать, возмем подготовленные ранее медианные композиты Сентинель-2, искать на них будем маску водных объектов.
 Наша задача -- восстановить маску при помощи нейросети.</p>
@@ -247,67 +252,11 @@ GRASS&gt; i.group <span class="nv">group</span><span class="o">=</span>may18 <sp
 </pre></div>
 
 
-<p>В результате растр res.tif можно будет использовать в ГИСах.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>В результате растр res.tif можно будет использовать в ГИСах.</p>
+    </div><!-- /.entry-content -->
 
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/realizatsiia-metodiki-iz-stati-development-of-a-global-90-m-water-body-map-na-baze-sentinel-2.html" rel="bookmark"
-                           title="Permalink to Реализация методики из статьи "Development of a global ~90 m water body map..." на базе Sentinel-2">Реализация методики из статьи "Development of a global ~90 m water body map..." на базе Sentinel-2</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-25T00:00:00+03:00">
-                Published: Ср 25 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
-</footer><!-- /.post-info -->                <h1>Задача</h1>
-<p>Ранее описывалась <a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">методика поиска водных объектов</a>, разработанная для Landsat. Она
-позволяет строить карты постоянных водных объектов, временно затапливаемых территорий, а также похожих на них по своим спектральным свойствам участков (лед, солончаки, и т.п.).
-Ниже рассматривается реализация "в лоб", выполненная в GEE на базе Sentinel-2.</p>
-<h1>Сложности</h1>
-<p>Исходная методика была …</p>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/realizatsiia-metodiki-iz-stati-development-of-a-global-90-m-water-body-map-na-baze-sentinel-2.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html" rel="bookmark"
-                           title="Permalink to Development of a global ~90 m water body map using multi-temporal Landsat images">Development of a global ~90 m water body map using multi-temporal Landsat images</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-16T00:00:00+03:00">
-                Published: Пн 16 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> <a href="https://kolesovdmitry.github.io/logbook/tag/landsat.html">Landsat</a> </p>
-</footer><!-- /.post-info -->                <p><strong>Обзор статьи
-<a href="https://www.sciencedirect.com/science/article/abs/pii/S0034425715301656">Development of a global ~90 m water body map using multi-temporal Landsat images</a></strong></p>
-<h2>Суть дела</h2>
-<p>Статья описывает то, как создавался продукт <a href="http://hydro.iis.u-tokyo.ac.jp/~yamadai/G3WBM/">Global 3 arc-second Water Body Map (G3WBM)</a>.
-Этот продукт представляет собой маски постоянных и временных водных объектов, построенных на временных сериях Ландстатов (более точно -- на четырех эпохах …</p>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-                </ol><!-- /#posts-list -->
-                </section><!-- /#content -->
+  </article>
+</section>
         <section id="extras" class="body">
         </section><!-- /#extras -->
 
