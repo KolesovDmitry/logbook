@@ -20,7 +20,134 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html">Ппример процедуры сегментации космосьемки сверточной сетью</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/monitoring-carnivore-populations-at-the-landscape-scale-occupancy-modelling-of-tigers-from-sign-surveys.html">Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-05-22T00:00:00+03:00">
+                Published: Пт 22 мая 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи
+Karanth, K. U., Gopalaswamy, A. M., Kumar, N. S., Vaidyanathan, S., Nichols, J. D., &amp; MacKenzie, D. I. (2011). Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys. Journal of Applied Ecology, 48(4), 1048-1056.</strong></p>
+<h2>Суть задачи</h2>
+<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. 
+В статье методика рассматривается на примере популяции тигров для тестового участка, расположенного в Индии.</p>
+<h2>Организация сбора данных</h2>
+<p>Исследуемая территория находится в центральной части Западных Гат (горная цепь на западе Индостана). Территория обследовалась
+в течении 15-ти месяцев и 2021 человеко-дней, было пройдено 4174 км, обнаружено 403 следов присутствия тигров.</p>
+<p>Территория была поделена на ячейки квадратной формы такого размера, чтобы ячейчка была несколько больше типичного размера "домашнего" участка тигра. Обычно в подобных исследованиях проводятся полевые работы в отдельных ячейках, а потом производится экстраполяция результатов на остальные ячейки, но в данной работе были обследованы все ячейки территории.</p>
+<p>Тигры выходят на дороги и в течении дня проходят по ним от 1 до 20-ти километров. Поэтому полевые группы также следовали вдоль дорог в поисках следов присутствия тигров (собственно следы, съеденные тиграми животные и пр.). Во избежание дублирования следы присутствия одного типа фиксировались 
+единожды в пределах стометрового участка дороги, т.е. если на стометровом участке были найдены, к примеру, два отпечатка
+лап, то эти отпечатки заносились в список находок как одна находка. Таки образом с каждым стометровым сегментом дороги
+были связаны метки 0 (не найдено) и 1 (есть следы). Помимо того на каждом сегменте отмечалось присутсвие следов видов-жертв и следов присутствия человека, в последствии эти данные использовались в качестве дополнительных переменных модели.</p>
+<h2>Вычисления</h2>
+<p>В качестве основной модели использовалась модель с явным указанием пространственной зависимости
+в собираемых данных, эта модель приводится в [2].</p>
+<p>Пусть <span class="math">\(\psi\)</span> -- доля территории, занятой тиграми, т.е. искомый параметр, а <span class="math">\(p\)</span> -- вероятность обнаружения тигра
+в ячейке, при условии, что он находится в ней.</p>
+<p>Классическая модель, представленная в [3], подразумевает, что обнаруженные/не обнаруженные в ячейках тигры могут
+быть описаны в виде схемы Бернулли. То есть получается, что каждый стометровый отрезок представляет собой
+одну попытку в схеме Бернулли. Но поскольку тигры проходят по дорогам значительные расстояния, то такой "наивный" подход
+нарушает требование независимости повторных экспериментов в модели (схеме). Поэтому дополнительно к данной модели 
+строилась еще одна, аналогичная приведенной в работе [2]. В этой модели в явном виде вводится пространственная 
+зависимость между наблюдениями, для этого постулируется, что система "тигр-наблюдатель" может быть описана
+в виде Марковского процесса: вероятность обнаружения тигра на текущем сегменте зависит от обнаружения его на предыдущем.</p>
+<p>Таким образом модель в целом следует подходу, описанному в статье [2] эту статью я уже <a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">разбирал ранее</a>. Однако на построении данной модели дело не закончилось, далее авторы:</p>
+<ul>
+<li>сравнили две модели (классическая на базе [3] и модель на базе [2]), используя критерий AIC;</li>
+<li>занялись выявлением основных эколого-географических факторов, связанных с тиграми.</li>
+</ul>
+<p>В рамках этого обзора данная часть не рассматривается.</p>
+<h1>Литература</h1>
+<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
+occupancy and related parameters. U.S. Geological Survey,
+Patuxent Wildlife Research Center, Laurel, Maryland, USA.
+hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
+<p>[2] Hines, J.E., Nichols, J.D., Royle, J.A., MacKenzie, D.I., Gopalaswamy, A.M.,
+Kumar, N.S. &amp; Karanth, K.U. (2010) Tigers on trails: occupancy modeling
+for cluster sampling. Ecological Applications, 20, 1456–1466.</p>
+<p>[3] MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Royle, J.A. &amp;
+Langtimm, C.A. (2002) Estimating site occupancy rates when detection
+probabilities are less than one. Ecology, 83, 2248–2255.</p>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html" rel="bookmark"
+                           title="Permalink to Ппример процедуры сегментации космосьемки сверточной сетью">Ппример процедуры сегментации космосьемки сверточной сетью</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-04-11T00:00:00+03:00">
                 Published: Сб 11 апреля 2020
@@ -31,228 +158,12 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
-</footer><!-- /.post-info --><p>Цель создания этого документа -- описать полную цепочку сегментации космоснимков от генерирования обучающих примеров и обучения нейросети до использования полученной сети.
+</footer><!-- /.post-info -->                <p>Цель создания этого документа -- описать полную цепочку сегментации космоснимков от генерирования обучающих примеров и обучения нейросети до использования полученной сети.
 В качестве демонстрационого примера выбрана задача поиска водных объектов, в качестве используемой сети -- UNet.</p>
-<p>Для примера исходных данных, с которыми будем работать, возмем подготовленные ранее медианные композиты Сентинель-2, искать на них будем маску водных объектов.
-Наша задача -- восстановить маску при помощи нейросети.</p>
-<p>Работа будет строиться по следующей схеме:</p>
-<ol>
-<li>Создание обучающей выборки.</li>
-<li>Построение нейросети.</li>
-<li>Обучение нейросети.</li>
-<li>Использование обученной сети.</li>
-</ol>
-<h1>Построение обучающей выборки</h1>
-<p>Для обучения сети нам потребуются примеры входных снимков и известных ответов. </p>
-<p>Обучающие данные сгенерируем в GRASS GIS и выгрузим в виде набора отдельных файлов формата GeoTIFF. Предполагается, что данные Сентинель-2 и маска водных объектов
-уже загружена в БД GRASS. В реальной жизни у нас не будет готовой маски, а будут лишь отдельные отрисованные примеры. Чтобы имитировать этот случай сгенерируем
-несколько случайных точек, а затем вырежем из космоснимков участки вокруг точек. Полученные участки будем использовать как обучающие.</p>
-<p>Проведем подготовительную работу: сгенерируем точки, объединим отдельные каналы снимков в одну группу:</p>
-<div class="highlight"><pre><span></span>GRASS&gt; v.random <span class="nv">out</span><span class="o">=</span>pts <span class="nv">np</span><span class="o">=</span><span class="m">5000</span> <span class="nv">restrict</span><span class="o">=</span>AOI
-GRASS&gt; v.db.addtable pts <span class="nv">col</span><span class="o">=</span><span class="s2">&quot;land int&quot;</span>
-GRASS&gt; v.what.rast pts <span class="nv">rast</span><span class="o">=</span>water <span class="nv">col</span><span class="o">=</span>land
-
-GRASS&gt; i.group <span class="nv">group</span><span class="o">=</span>may18 <span class="nv">input</span><span class="o">=</span><span class="s2">&quot;may18.green,may18.ndli,may18.ndvi,may18.ndwi,may18.nir,may18.red,may18.swir,may18.tir&quot;</span>
-</pre></div>
-
-
-<p>Построим вокруг каждой точки буфер размеров в 32 пикселя и экспортируем данные в виде отдельного изображения в формате GeoTIFF.
-Отметим, что число пикселей в тайле (32) взято для примера, и можно использовать другие варианты. Более того, далее мы создадим нейросеть, которая может
-обучаться на различных размерах тайлов.</p>
-<div class="highlight"><pre><span></span><span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">raster</span><span class="o">=</span><span class="s1">&#39;may18.green&#39;</span><span class="p">)</span>
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">region</span> <span class="o">=</span> <span class="n">gscript</span><span class="o">.</span><span class="n">parse_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;g&#39;</span><span class="p">)</span>
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">resolution</span> <span class="o">=</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;ewres&#39;</span><span class="p">]</span>
-
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">PIXELS</span> <span class="o">=</span> <span class="mi">16</span>
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">DELTA</span> <span class="o">=</span> <span class="n">PIXELS</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">resolution</span><span class="p">)</span>
-
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="n">points</span> <span class="o">=</span> <span class="n">gscript</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.out.ascii&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;pts&#39;</span><span class="p">)</span>
-<span class="n">PythonGRASS</span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="o">.</span><span class="n">split</span><span class="p">():</span>
-    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">cat</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span>
-    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
-    <span class="n">n</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="n">lat</span> <span class="o">+</span> <span class="n">DELTA</span><span class="p">,</span> <span class="n">lat</span> <span class="o">-</span> <span class="n">DELTA</span>
-    <span class="n">w</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="n">lon</span> <span class="o">-</span> <span class="n">DELTA</span><span class="p">,</span> <span class="n">lon</span> <span class="o">+</span> <span class="n">DELTA</span>
-    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="n">s</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="n">e</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;p&#39;</span><span class="p">)</span>
-    <span class="n">outname</span> <span class="o">=</span> <span class="s1">&#39;may_18_&#39;</span> <span class="o">+</span> <span class="n">cat</span> <span class="o">+</span> <span class="s1">&#39;.tif&#39;</span>
-    <span class="n">water_name</span> <span class="o">=</span> <span class="s1">&#39;water_&#39;</span> <span class="o">+</span> <span class="n">cat</span> <span class="o">+</span> <span class="s1">&#39;.tif&#39;</span>
-    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;r.out.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;may18&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">outname</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;cm&#39;</span><span class="p">)</span>
-    <span class="n">gscript</span><span class="o">.</span><span class="n">run_command</span><span class="p">(</span><span class="s1">&#39;r.out.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s1">&#39;water&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">water_name</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;cm&#39;</span><span class="p">)</span>
-</pre></div>
-
-
-<p>Данный код генерирует 5000 тайлов на базе снимка Сентинель-2 и маски воды, которые называются may_18_NUM.tif и water_NUM.tif соответвенно.</p>
-<h1>Создание нейросети</h1>
-<p>Создадим нейросеть воспользовавшись фреймворком TensorFlow. В качестве примера создадим Unet, состоящую всего из пары слоев в каждом направлении (кодировщика и декодировщика).</p>
-<p>Поскольку у нас маска воды состоит из двух классов (вода/не-вода), то можно рассматривать задачу как задачу регрессии, а не классификации. Поэтому при создании
-сети на выходной слой поставим функцию активации "гиперболический тангенс", которая ограничивает выход сети в диапазоне от -1 до 1, а для 
-функции потерь возьмем обычную среднеквадратичную разаность.</p>
-<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
-<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">layers</span>
-<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">losses</span>
-<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">models</span>
-<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">metrics</span>
-<span class="kn">from</span> <span class="nn">tensorflow.python.keras</span> <span class="kn">import</span> <span class="n">optimizers</span>
-
-
-<span class="k">def</span> <span class="nf">conv_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">input_tensor</span><span class="p">)</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">encoder</span>
-
-<span class="k">def</span> <span class="nf">encoder_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
-    <span class="n">encoder</span> <span class="o">=</span> <span class="n">conv_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">)</span>
-    <span class="n">encoder_pool</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">MaxPooling2D</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">strides</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))(</span><span class="n">encoder</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">encoder_pool</span><span class="p">,</span> <span class="n">encoder</span>
-
-<span class="k">def</span> <span class="nf">decoder_block</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">concat_tensor</span><span class="p">,</span> <span class="n">num_filters</span><span class="p">):</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2DTranspose</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">strides</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">input_tensor</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">concat_tensor</span><span class="p">,</span> <span class="n">decoder</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="n">num_filters</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">()(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="n">decoder</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;relu&#39;</span><span class="p">)(</span><span class="n">decoder</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">decoder</span>
-
-
-<span class="k">def</span> <span class="nf">get_model</span><span class="p">(</span><span class="n">band_count</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="s1">&#39;MeanSquaredError&#39;</span><span class="p">,</span> <span class="n">show_metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;RootMeanSquaredError&#39;</span><span class="p">]):</span>
-    <span class="n">inputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">band_count</span><span class="p">])</span> <span class="c1"># 32x32</span>
-    <span class="n">encoder0_pool</span><span class="p">,</span> <span class="n">encoder0</span> <span class="o">=</span> <span class="n">encoder_block</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span> <span class="c1"># 16x16</span>
-    <span class="n">encoder1_pool</span><span class="p">,</span> <span class="n">encoder1</span> <span class="o">=</span> <span class="n">encoder_block</span><span class="p">(</span><span class="n">encoder0_pool</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span> <span class="c1"># 8x8</span>
-    <span class="n">center</span> <span class="o">=</span> <span class="n">conv_block</span><span class="p">(</span><span class="n">encoder1_pool</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span> <span class="c1"># center</span>
-    <span class="n">decoder1</span> <span class="o">=</span> <span class="n">decoder_block</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="n">encoder1</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span> <span class="c1"># 16</span>
-    <span class="n">decoder0</span> <span class="o">=</span> <span class="n">decoder_block</span><span class="p">(</span><span class="n">decoder1</span><span class="p">,</span> <span class="n">encoder0</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span> <span class="c1"># 32</span>
-    <span class="n">outputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Conv2D</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;tanh&#39;</span><span class="p">)(</span><span class="n">decoder0</span><span class="p">)</span>
-
-    <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">inputs</span><span class="p">],</span> <span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">outputs</span><span class="p">])</span>
-
-    <span class="n">opt</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">optimizers</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">)</span>
-
-    <span class="n">model</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-        <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="c1"># optimizers.get(optimizer), </span>
-        <span class="n">loss</span><span class="o">=</span><span class="n">losses</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">loss</span><span class="p">),</span>
-        <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">show_metrics</span><span class="p">])</span>
-
-    <span class="k">return</span> <span class="n">model</span>
-</pre></div>
-
-
-<p>Основная функция здесь  -- get_model, она принимает на вход набор параметров сети (основной - число каналов снимка) и параметры оптимизатора.
-Внутри функции стоит обратить внимание на первую строку</p>
-<div class="highlight"><pre><span></span>    <span class="n">inputs</span> <span class="o">=</span> <span class="n">layers</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">band_count</span><span class="p">])</span> <span class="c1"># 32x32</span>
-</pre></div>
-
-
-<p>Эта строка задает размерность входного изображения. С одной стороны мы генерировали тайлы размером 32x32 пикселя и можно было бы прописать
-размеры этих тайлов в параметре shape, но нас интересует обработка больших по объему снимков, поэтому мы не будем указывать размерность входных
-данных, что позволит нам при использовании сети подавать на вход другие размеры снимков.</p>
-<p>Это иллюстративный пример, тем не менее данную функцию легко модифицировать под свою задачу, например, можно изменить число слоев или задать иные метрики.</p>
-<h1>Обучение сети</h1>
-<p>Для обучения сети прочитаем сгенерированные тайлы и запустим процесс настройки параметров:</p>
-<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_sample_image</span><span class="p">(</span><span class="n">num</span><span class="p">):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;may_18_</span><span class="si">%s</span><span class="s1">.tif&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="p">))</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>   
-    <span class="n">x</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">7</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">30</span>      <span class="c1"># &quot;Нормализация&quot;</span>
-    <span class="n">y</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;water_</span><span class="si">%s</span><span class="s1">.tif&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="p">))</span> <span class="o">-</span> <span class="mf">1.0</span>
-    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-
-
-<span class="k">def</span> <span class="nf">get_data</span><span class="p">(</span><span class="n">num</span><span class="p">):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">y</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num</span><span class="p">):</span>
-        <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="n">get_sample_image</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
-        <span class="n">x</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
-        <span class="n">y</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
-
-<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">get_data</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
-
-<span class="n">m</span> <span class="o">=</span> <span class="n">get_model</span><span class="p">()</span>
-<span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.67</span><span class="p">)</span>
-
-<span class="n">m</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;saved_model/model_100&#39;</span><span class="p">)</span>
-</pre></div>
-
-
-<p>Здесь функция get_sample_image считывает обучающую пару изображений под номером num, а функция get_data генерирует обучающее множество целиком.
-В функции чтения данных нужно обратить внимание на следующую пару строк:</p>
-<ul>
-<li>первая строка x = np.nan_to_num(x) производит замену всех NaN на нули: дело
-в том, что в реальных снимках часть пикселей на изображении может отсуствовать и лучше обработать этот вариант заранее, заменив такие пиксели.</li>
-<li>второе замечание касается нормализации данных: x[:, :, 7] /= 30 Эта строка специфична для конкретного набора данных: все каналы используемого нами изображения
-лежат в диапазоне от -1 до 1, но последний канал хранит температуру, которая может изменяться в более широких пределах. 
-Поэтому и производится деление на 30 градусов, чтобы все каналы были приблизительно одинаковы по своему размаху.</li>
-</ul>
-<p>Собственно обучение производится одной строкой:</p>
-<div class="highlight"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.67</span><span class="p">)</span>
-</pre></div>
-
-
-<p>При этом происходит разбиение обучающего множетва на две части - рабочее, на котором происходит собственно обучение, и вадидационное, на котором тестируется качество сети.
-При обучении функция fit выводит на экран значение метрик качества для рабочего и валидационного множества. На последнем шаге модель сохраняется на диск.</p>
-<h1>Использование сети</h1>
-<p>После того, как сеть будет обучена, ее можно применить для классификации изображения. Для этого экспортируем исходные данные для анализа (изображение may.tif),
-прочитаем сохраненную сеть и применим ее к изображению:</p>
-<div class="highlight"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s1">&#39;saved_model/model_100&#39;</span><span class="p">)</span>
-
-<span class="n">data</span> <span class="o">=</span> <span class="n">tiff</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;may.tif&#39;</span><span class="p">)</span>  <span class="c1"># Экспортированный файл</span>
-<span class="n">data</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">7</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">30</span>            <span class="c1"># Нормирование (не забудьте, как обучали!)</span>
-<span class="n">data1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:],])</span>  <span class="c1"># См. раздел &quot;подводные камни&quot;</span>
-
-<span class="n">answ</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">data1</span><span class="p">)</span>
-<span class="n">tiff</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s1">&#39;res.tif&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">answ</span><span class="p">)</span>
-</pre></div>
-
-
-<p>На этом этапе у нас есть изображение с res.tif, в котором хранится полученный ответ нейросети. Пример исходного изображения для анализа (восьмиканальный GeoTIFF 'may') и результат
-работы сети показан ниже.</p>
-<p>Исходное изображение для анализа:
-<img alt="Source image" src="images/2020-04-10/may.png" title="Исходное изображение" width="90%"></p>
-<p>Результат работы нейросети:
-<img alt="answer image" src="images/2020-04-10/answer.png" title="Результат" width="90%"></p>
-<p>Обратите внимание на "дырку" в середине результирующего изображения. Она связана с тем, что тепловой канал, который использовался в качестве входных данных, содержал точно такую же "дыру",
-и она "прожглась" в ответе.</p>
-<h2>Подводные ками</h2>
-<h3>Этап вычислений</h3>
-<p>При обработке снимка наша модель дважды снижает размер изображения (см. функцию encoder_block и ее вызов в модели) на этапе кодировки. Затем, на этапе декодирования
-производится склеивание двух растров - полученного с этапа кодирования и расскодированного (см. layers.concatenate([concat_tensor, decoder) в функции decoder_block).</p>
-<p>Если на этапе кодирования подать на вход нечетное число пикселей в растре, то затем при декодировании возникнет ошибка "Dimensions of inputs should match", т.к. при 
-декодировании будут склеиваться различные по размеру растры. Чтобы такого не происходило, проще всего отрезать часть изображения таким образом, чтобы оно без остатка 
-делилось на четыре (два раза по два): такое изображение сначала может безболезненно уменьшится в четыре раза, а затем восстановиться обратно. Этим соображением и
-объясняется появление строки "data1 = np.array([data[:-1, :-1, :],])" в коде:</p>
-<div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
-<span class="p">(</span><span class="mi">1914</span><span class="p">,</span> <span class="mi">3135</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
-
-<span class="o">&gt;</span> <span class="n">data1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="p">:],])</span>
-<span class="o">&gt;</span> <span class="n">data1</span><span class="o">.</span><span class="n">shape</span>
-<span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1912</span><span class="p">,</span> <span class="mi">3132</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
-</pre></div>
-
-
-<h3>Этап использования</h3>
-<p>Естественно, что TensorFlow ничего не знает о географических прявязках и системах координат. Поэтому результирующее изображение теряет информацию о положении снимка в пространстве.
-Простым способом восстановить информацию о координатах -- скопировать ее из исходного снимка:</p>
-<div class="highlight"><pre><span></span>&gt; gdalcopyproj.py may.tif res.tif
-</pre></div>
-
-
-<p>В результате растр res.tif можно будет использовать в ГИСах.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>Для примера исходных данных, с которыми будем работать, возмем подготовленные ранее медианные композиты Сентинель-2, искать на …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/pprimer-protsedury-segmentatsii-kosmosemki-svertochnoi-setiu.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
@@ -458,33 +369,6 @@ P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wu
 <p>Статья описывает то, как создавался продукт <a href="http://hydro.iis.u-tokyo.ac.jp/~yamadai/G3WBM/">Global 3 arc-second Water Body Map (G3WBM)</a>.
 Этот продукт представляет собой маски постоянных и временных водных объектов, построенных на временных сериях Ландстатов (более точно -- на четырех эпохах …</p>
                 <a class="readmore" href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html" rel="bookmark"
-                           title="Permalink to Предобработка данных Sentinel-2 в Google EarthEngine">Предобработка данных Sentinel-2 в Google EarthEngine</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-13T00:00:00+03:00">
-                Published: Пт 13 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
-</footer><!-- /.post-info -->                <h1>Задача</h1>
-<p>Есть большая задача -- построение маски водных объектов по данным ДЗЗ, точнее Sentinel-2. Эта задача разбивается
-на множество отдельных подзадач, в частности сейчас решаем вопрос о сборе обучающих данных для алгоритмов маскирования.</p>
-<p>Для решения этой частной задачи нужно собрать данные Sentinel-2 на интересующую нас территорию и:</p>
-<ul>
-<li>удалить с них облака …</li></ul>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">read more</a>
                 </div><!-- /.entry-content -->
             </article></li>
                 </ol><!-- /#posts-list -->

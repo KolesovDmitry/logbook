@@ -20,91 +20,59 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/a-threshold-selection-method-from-gray-level-histograms.html">A threshold selection method from gray-level histograms</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/monitoring-carnivore-populations-at-the-landscape-scale-occupancy-modelling-of-tigers-from-sign-surveys.html">Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys</a></h1>
 <footer class="post-info">
-        <abbr class="published" title="2020-02-20T00:00:00+03:00">
-                Published: Чт 20 февраля 2020
+        <abbr class="published" title="2020-05-22T00:00:00+03:00">
+                Published: Пт 22 мая 2020
         </abbr>
 
         <address class="vcard author">
                 By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/raster-processing.html">Raster Processing</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор методов статьи 
-<a href="http://webserver2.tecgraf.puc-rio.br/~mgattass/cg/trbImg/Otsu.pdf">Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66</a></strong></p>
-<h2>О чем пойдет речь</h2>
-<p>В статье авторы рассматривают изображение в градациях серого и задаются вопросом о том, как привести его к бинарному виду.
-Например, изображение может представлять собой результат классификации, когда "черные" пиксели относятся к одному классу, а "белые" к другому, и возникает вопрос,
-как автоматически провести границу между классами, т.е. как выбрать такой порог яркости, ниже которого пиксели будут
-считаться первым классом, а выше -- вторым.</p>
-<h2>Что предлагается</h2>
-<h3>Обозначения</h3>
-<p>Пусть <span class="math">\(L\)</span> - число возможных градаций серого на изображении ([1, 2, ..., <span class="math">\(L\)</span>]), <span class="math">\(n_i\)</span> -- число пикселей для каждой градации и  <span class="math">\(N=n_1, + \dots + n_L\)</span>.</p>
-<p>Пусть <span class="math">\(p_i = n_i/N\)</span> - частоты, с которыми встречаются соотвествующие яркости пикселей.</p>
-<p>Пусть <span class="math">\(k\)</span> -- граница между классами (искомый порог), тогда <span class="math">\(C_0\)</span> -- пиксели с яркостями не превышающими порога ([1, 2,... <span class="math">\(k\)</span>]), а <span class="math">\(C_1\)</span> -- пиксели с яркостями выше порога ([<span class="math">\(k+1\)</span>, ... <span class="math">\(L\)</span>]).</p>
-<h3>Логика рассуждений</h3>
-<p>Разобьем изображение на два класса в соответствии с порогом <span class="math">\(k\)</span>. Для пикселей каждого класса по отдельности мы можем расчитать частоту их встречаемости, а также выборочные средние и дисперсии.</p>
-<p>Частоты:
-</p>
-<div class="math">$$
-\omega_0(k) = \sum_{i=1}^k p_i,
-$$</div>
-<div class="math">$$
-\omega_1(k) = \sum_{i=k+1}^L p_i.
-$$</div>
-<p>Средние по классам:
-</p>
-<div class="math">$$
-\mu_0(k) = \sum_{i=1}^{k} i Pr(i| C_0),
-$$</div>
-<div class="math">$$
-\mu_1(k) = \sum_{i=k+1}^{L} i Pr(i| C_1).
-$$</div>
-<p>
-Общее среднее:
-</p>
-<div class="math">$$
-\mu_1(k) = \sum_{i=1}^{L} i p_i.
-$$</div>
-<p>Дисперсии
-</p>
-<div class="math">$$
-\sigma_0(k) = \sum_{i=1}^{k}(i-\mu_0)  Pr(i| C_0),
-$$</div>
-<div class="math">$$
-\sigma_1(k) = \sum_{i=k+1}^{L}(i-\mu_1)  Pr(i| C_1).
-$$</div>
-<p>Далее предлагается воспользоваться подходом, похожим на те, что используются в дискриминантном и кластерном анализах: нужно выбрать такую величину <span class="math">\(k\)</span>, которая позволит максимально отделить
-друг от друга классы <span class="math">\(C_0\)</span> и <span class="math">\(C_1\)</span>. Другими словами выбирать порог следует таким образом, чтобы внутриклассовая дисперсия была как можно меньше по сравнению с общей дисперсией или межклассовой дисперсией.</p>
-<p>Авторы рассматривают три критерия и показывают, что они эквивалентны между собой (для краткости записи опустим функциональную зависимоть дисперсий от <span class="math">\(k\)</span>):</p>
-<div class="math">$$
-\lambda(k) = \frac{\sigma^2_b}{\sigma^2_w} \to \max_{1\leq k \leq L},
-\qquad \kappa(k) = \frac{\sigma^2_t}{\sigma^2_w} \to \max_{1\leq k \leq L},
-\qquad \eta(k) = \frac{\sigma^2_b}{\sigma^2_t} \to \max_{1\leq k \leq L}, 
-$$</div>
-<p>где <span class="math">\(\sigma_b\)</span>, <span class="math">\(\sigma_w\)</span> и <span class="math">\(\sigma_t\)</span> -- соответственно межклассовая, внутриклассовая и общая дисперсии, которые можно вычислить по формулам (вывод формул опускаю):</p>
-<div class="math">$$
-\sigma^2_b = \omega_0\omega_1(\mu_1 - \mu_2)^2,
-$$</div>
-<div class="math">$$
-\sigma^2_w = \omega_0\sigma_0^2 + \omega_1\sigma_1^2,
-$$</div>
-<div class="math">$$
-\sigma^2_t = \sum_{i=1}^L (i-\mu_t)^2.
-$$</div>
-<p>Авторы показывают, что задача поиска максимума по данным критериям в конечном итоге эквивалентна задаче максимизации величины <span class="math">\(\sigma_b\)</span> и, таким образом,
-оптимальный порог <span class="math">\(k\)</span> должен быть выбран таким, чтобы он давал максимум величины <span class="math">\(\sigma_b\)</span>.</p>
-<h2>Несколько замечаний</h2>
-<p>Данный подход выглядит интересным, но он подразумевает, что на изображении присутствуют пиксели двух классов, другими словами, он будет хорошо работать в случае бимодальной
-функции распределения яркостей пикселей изображения. (Авторы приводят способ расширить подход на несколько классов, а также дают пример бинаризации изображения с унимодальной функцией распределения
-яркостей, но все же, все же...)</p>
-<p>Поэтому у меня есть некоторые сомнения, о том, насколько хорошо ляжет данный подход на наши задачи. Вообще задача бинаризации растровых изображений у нас возникает часто,
-но на данную статью я наткнулся, разбирая <a href="https://kolesovdmitry.github.io/logbook/near-real-time-wildfire-progression-monitoring-with-sentinel-1-sar-time-series-and-deep-learning.html">работу по мониторингу пожаров</a>. В задаче мониторинга предлагаемый подход должен сработать
-по организации эксперимента -- там мониторятся заведомо изменившиеся участки и на изображении будут заведомо присуствовать два класса (гарь/не-гарь).</p>
-<p>В нашем же случае мониторинга лесоизменений ситуация чуть сложнее -- мы мониторим участки, которые (а) могут вообще не менятся (б) на них могут присутвовать различные естественные изменения (например, листопады).
-Поэтому данный подход может "сбоить" в наших условиях. Но тем не менее, его обязательно нужно попробовать, т.к. даже если он и будет требовать ручной доводки оператором, все равно полуавтоматический
-выбор пороговой дает какую-то отправную точку для дальнейшего поиска оптимальной величины.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи
+Karanth, K. U., Gopalaswamy, A. M., Kumar, N. S., Vaidyanathan, S., Nichols, J. D., &amp; MacKenzie, D. I. (2011). Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys. Journal of Applied Ecology, 48(4), 1048-1056.</strong></p>
+<h2>Суть задачи</h2>
+<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. 
+В статье методика рассматривается на примере популяции тигров для тестового участка, расположенного в Индии.</p>
+<h2>Организация сбора данных</h2>
+<p>Исследуемая территория находится в центральной части Западных Гат (горная цепь на западе Индостана). Территория обследовалась
+в течении 15-ти месяцев и 2021 человеко-дней, было пройдено 4174 км, обнаружено 403 следов присутствия тигров.</p>
+<p>Территория была поделена на ячейки квадратной формы такого размера, чтобы ячейчка была несколько больше типичного размера "домашнего" участка тигра. Обычно в подобных исследованиях проводятся полевые работы в отдельных ячейках, а потом производится экстраполяция результатов на остальные ячейки, но в данной работе были обследованы все ячейки территории.</p>
+<p>Тигры выходят на дороги и в течении дня проходят по ним от 1 до 20-ти километров. Поэтому полевые группы также следовали вдоль дорог в поисках следов присутствия тигров (собственно следы, съеденные тиграми животные и пр.). Во избежание дублирования следы присутствия одного типа фиксировались 
+единожды в пределах стометрового участка дороги, т.е. если на стометровом участке были найдены, к примеру, два отпечатка
+лап, то эти отпечатки заносились в список находок как одна находка. Таки образом с каждым стометровым сегментом дороги
+были связаны метки 0 (не найдено) и 1 (есть следы). Помимо того на каждом сегменте отмечалось присутсвие следов видов-жертв и следов присутствия человека, в последствии эти данные использовались в качестве дополнительных переменных модели.</p>
+<h2>Вычисления</h2>
+<p>В качестве основной модели использовалась модель с явным указанием пространственной зависимости
+в собираемых данных, эта модель приводится в [2].</p>
+<p>Пусть <span class="math">\(\psi\)</span> -- доля территории, занятой тиграми, т.е. искомый параметр, а <span class="math">\(p\)</span> -- вероятность обнаружения тигра
+в ячейке, при условии, что он находится в ней.</p>
+<p>Классическая модель, представленная в [3], подразумевает, что обнаруженные/не обнаруженные в ячейках тигры могут
+быть описаны в виде схемы Бернулли. То есть получается, что каждый стометровый отрезок представляет собой
+одну попытку в схеме Бернулли. Но поскольку тигры проходят по дорогам значительные расстояния, то такой "наивный" подход
+нарушает требование независимости повторных экспериментов в модели (схеме). Поэтому дополнительно к данной модели 
+строилась еще одна, аналогичная приведенной в работе [2]. В этой модели в явном виде вводится пространственная 
+зависимость между наблюдениями, для этого постулируется, что система "тигр-наблюдатель" может быть описана
+в виде Марковского процесса: вероятность обнаружения тигра на текущем сегменте зависит от обнаружения его на предыдущем.</p>
+<p>Таким образом модель в целом следует подходу, описанному в статье [2] эту статью я уже <a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">разбирал ранее</a>. Однако на построении данной модели дело не закончилось, далее авторы:</p>
+<ul>
+<li>сравнили две модели (классическая на базе [3] и модель на базе [2]), используя критерий AIC;</li>
+<li>занялись выявлением основных эколого-географических факторов, связанных с тиграми.</li>
+</ul>
+<p>В рамках этого обзора данная часть не рассматривается.</p>
+<h1>Литература</h1>
+<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
+occupancy and related parameters. U.S. Geological Survey,
+Patuxent Wildlife Research Center, Laurel, Maryland, USA.
+hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
+<p>[2] Hines, J.E., Nichols, J.D., Royle, J.A., MacKenzie, D.I., Gopalaswamy, A.M.,
+Kumar, N.S. &amp; Karanth, K.U. (2010) Tigers on trails: occupancy modeling
+for cluster sampling. Ecological Applications, 20, 1456–1466.</p>
+<p>[3] MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Royle, J.A. &amp;
+Langtimm, C.A. (2002) Estimating site occupancy rates when detection
+probabilities are less than one. Ecology, 83, 2248–2255.</p>
 <script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
@@ -172,6 +140,32 @@ $$</div>
                     <h1>Other articles</h1>
                     <hr />
                     <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/a-threshold-selection-method-from-gray-level-histograms.html" rel="bookmark"
+                           title="Permalink to A threshold selection method from gray-level histograms">A threshold selection method from gray-level histograms</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2020-02-20T00:00:00+03:00">
+                Published: Чт 20 февраля 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/raster-processing.html">Raster Processing</a> </p>
+</footer><!-- /.post-info -->                <p><strong>Обзор методов статьи 
+<a href="http://webserver2.tecgraf.puc-rio.br/~mgattass/cg/trbImg/Otsu.pdf">Otsu, N. A threshold selection method from gray-level histograms. IEEE Trans. Syst. Man, Cybern. 9, 62–66</a></strong></p>
+<h2>О чем пойдет речь</h2>
+<p>В статье авторы рассматривают изображение в градациях серого и задаются вопросом о том, как привести его к бинарному виду.
+Например, изображение может представлять собой результат классификации …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/a-threshold-selection-method-from-gray-level-histograms.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
