@@ -59,8 +59,8 @@ pancy rates when detection probabilities are less than one. Ecology 83: 2248–2
 [4] Royle JA, Nichols JD (2003) Estimating abundance from repeated presence-absence data or point
 counts. Ecology 84: 777–790.
 
-[5] Karanth KU, Gopalaswamy AM, Kumar NS, Vaidyanathan S, Nichols JD, et al. (2011) Monitoring carni-
-vore populations at the landscape scale: occupancy modelling of tigers from sign surveys. J Appl Ecol
+[5] Karanth KU, Gopalaswamy AM, Kumar NS, Vaidyanathan S, Nichols JD, et al. (2011) Monitoring 
+carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys. J Appl Ecol
 48: 1048–1056.
 
 
