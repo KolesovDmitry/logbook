@@ -11,7 +11,7 @@
                 <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
                 <nav><ul>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection.html">Change Detection</a></li>
-                    <li><a href="https://kolesovdmitry.github.io/logbook/category/google-earthengine-tools.html">Google EarthEngine tools</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a></li>
                     <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
                     <li class="active"><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
@@ -20,10 +20,10 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/monitoring-carnivore-populations-at-the-landscape-scale-occupancy-modelling-of-tigers-from-sign-surveys.html">Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/estimating-site-occupancy-rates-when-detection-probabilities-are-less-than-on.html">Estimating site occupancy rates when detection probabilities are less than on</a></h1>
 <footer class="post-info">
-        <abbr class="published" title="2020-05-22T00:00:00+03:00">
-                Published: Пт 22 мая 2020
+        <abbr class="published" title="2020-06-18T00:00:00+03:00">
+                Published: Чт 18 июня 2020
         </abbr>
 
         <address class="vcard author">
@@ -32,47 +32,88 @@
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
 </footer><!-- /.post-info --><p><strong>Обзор основных методов статьи
-Karanth, K. U., Gopalaswamy, A. M., Kumar, N. S., Vaidyanathan, S., Nichols, J. D., &amp; MacKenzie, D. I. (2011). Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys. Journal of Applied Ecology, 48(4), 1048-1056.</strong></p>
-<h2>Суть задачи</h2>
-<p>Нужно создать методику оценки ареала вида по собранным следам присутствия. 
-В статье методика рассматривается на примере популяции тигров для тестового участка, расположенного в Индии.</p>
-<h2>Организация сбора данных</h2>
-<p>Исследуемая территория находится в центральной части Западных Гат (горная цепь на западе Индостана). Территория обследовалась
-в течении 15-ти месяцев и 2021 человеко-дней, было пройдено 4174 км, обнаружено 403 следов присутствия тигров.</p>
-<p>Территория была поделена на ячейки квадратной формы такого размера, чтобы ячейчка была несколько больше типичного размера "домашнего" участка тигра. Обычно в подобных исследованиях проводятся полевые работы в отдельных ячейках, а потом производится экстраполяция результатов на остальные ячейки, но в данной работе были обследованы все ячейки территории.</p>
-<p>Тигры выходят на дороги и в течении дня проходят по ним от 1 до 20-ти километров. Поэтому полевые группы также следовали вдоль дорог в поисках следов присутствия тигров (собственно следы, съеденные тиграми животные и пр.). Во избежание дублирования следы присутствия одного типа фиксировались 
-единожды в пределах стометрового участка дороги, т.е. если на стометровом участке были найдены, к примеру, два отпечатка
-лап, то эти отпечатки заносились в список находок как одна находка. Таки образом с каждым стометровым сегментом дороги
-были связаны метки 0 (не найдено) и 1 (есть следы). Помимо того на каждом сегменте отмечалось присутсвие следов видов-жертв и следов присутствия человека, в последствии эти данные использовались в качестве дополнительных переменных модели.</p>
-<h2>Вычисления</h2>
-<p>В качестве основной модели использовалась модель с явным указанием пространственной зависимости
-в собираемых данных, эта модель приводится в [2].</p>
-<p>Пусть <span class="math">\(\psi\)</span> -- доля территории, занятой тиграми, т.е. искомый параметр, а <span class="math">\(p\)</span> -- вероятность обнаружения тигра
-в ячейке, при условии, что он находится в ней.</p>
-<p>Классическая модель, представленная в [3], подразумевает, что обнаруженные/не обнаруженные в ячейках тигры могут
-быть описаны в виде схемы Бернулли. То есть получается, что каждый стометровый отрезок представляет собой
-одну попытку в схеме Бернулли. Но поскольку тигры проходят по дорогам значительные расстояния, то такой "наивный" подход
-нарушает требование независимости повторных экспериментов в модели (схеме). Поэтому дополнительно к данной модели 
-строилась еще одна, аналогичная приведенной в работе [2]. В этой модели в явном виде вводится пространственная 
-зависимость между наблюдениями, для этого постулируется, что система "тигр-наблюдатель" может быть описана
-в виде Марковского процесса: вероятность обнаружения тигра на текущем сегменте зависит от обнаружения его на предыдущем.</p>
-<p>Таким образом модель в целом следует подходу, описанному в статье [2] эту статью я уже <a href="https://kolesovdmitry.github.io/logbook/tigers-on-trails-occupancy-modeling-for-cluster-sampling.html">разбирал ранее</a>. Однако на построении данной модели дело не закончилось, далее авторы:</p>
+<a href="https://projects.ncsu.edu/cals/course/zo501/2016%20Sampling%20Lab/MacKenzie%202002.pdf">MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Royle, J.A. &amp;
+Langtimm, C.A. (2002) Estimating site occupancy rates when detection probabilities are less than one. Ecology, 83, 2248–2255.</a>
+</strong></p>
+<h2>Вводная часть</h2>
+<p>Ранее уже рассматривалось несколько работ, посвященных оценке ореала животных по следам присустствия. 
+Значительная часть исследований
+в данной тематике ссылается на статью MacKenzie с соавторами, следует предложенной в ней методике или расширяет ее.</p>
+<p>Указанная работа описывает подход для оценки пропорции местообитаний, занятых исследуемым животным,
+при этом важно отметить, что изначально авторы занимались земноводными и обследовали озера/болота,
+поэтому описанная ими методика -- дискретная, точнее, сбор данных происходит в дискретном пространстве:
+пространство естественным образом разбито на ограниченные участки (озера), для которых возможно только два
+варианта событий -- в озере либо найдены следы присутствия вида, либо не найдены.</p>
+<p>При сборе данных о присутсвии вида нужно учитывать возможность того, что даже если вид присутствует
+на территории, то следы его присуствия могут быть пропущены при сборе данных по тем или иным причинам,
+другими словами вероятность детекции вида представляет собой величину, меньшую единицы, даже при условии того,
+что вид присутсвует.</p>
+<p>MacKenzie и соавторы исходят из посылки, что если вероятность обнаружения следов меньше единицы,
+то неоднократным повторением обследования одного и того же места (но в разные периоды времени) можно
+получить оценку вероятности обнаружения следов. А зная данную оценку, можно выйти на оценку доли занятых
+видом мест среди всех обследованных потенциальных местообитаний.
+Статья MacKenzie et al. описывает математические основы процедуры оценки данной вероятности и условия их применимости.</p>
+<h2>Обозначения</h2>
+<p>Пусть <span class="math">\(\psi_i\)</span> -- вероятность того, что вид присутствует в месте номер <span class="math">\(i\)</span>, <span class="math">\(p_{it}\)</span> -- вероятность того, что
+следы присутствия вида были обнаружены в месте номер <span class="math">\(i\)</span> в ходе обследования номер <span class="math">\(t\)</span> (при условии, что вид
+присутсвовал в данном месте). Пусть <span class="math">\(N\)</span> -- число обследованных мест, а <span class="math">\(T\)</span> -- число проведенных циклов исследований,
+<span class="math">\(n_t\)</span> -- число мест, в которых были найдены следы присутствия вида в ходе обследования номер <span class="math">\(t\)</span>, <span class="math">\(n_{o}\)</span> -- общее количество
+мест, в которых следы присутствия были найдены хотя бы один раз.</p>
+<h2>Процедура сбора данных и предположения, лежащие в ее основе</h2>
+<p>Проводится обследование <span class="math">\(N\)</span> мест (участков), в ходе <span class="math">\(T\)</span> отдельных посещений. Предполагается, что:</p>
+<p>(1) ситуация на участках стабильна, т.е. обследуемые участки заняты (или не заняты) видом в течении всего периода исследований:</p>
 <ul>
-<li>сравнили две модели (классическая на базе [3] и модель на базе [2]), используя критерий AIC;</li>
-<li>занялись выявлением основных эколого-географических факторов, связанных с тиграми.</li>
+<li>ни одного пустого участка (из исследуемых) за время обследования не было заселено видом;</li>
+<li>ни с одного занятого участка (из исследуемых) не было покинуто видом за время обследования.</li>
 </ul>
-<p>В рамках этого обзора данная часть не рассматривается.</p>
-<h1>Литература</h1>
-<p>[1] Hines, J. E. 2006. PRESENCE2: software to estimate patch
-occupancy and related parameters. U.S. Geological Survey,
-Patuxent Wildlife Research Center, Laurel, Maryland, USA.
-hhttp://www.mbr-pwrc.usgs.gov/software/presence.html</p>
-<p>[2] Hines, J.E., Nichols, J.D., Royle, J.A., MacKenzie, D.I., Gopalaswamy, A.M.,
-Kumar, N.S. &amp; Karanth, K.U. (2010) Tigers on trails: occupancy modeling
-for cluster sampling. Ecological Applications, 20, 1456–1466.</p>
-<p>[3] MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Royle, J.A. &amp;
-Langtimm, C.A. (2002) Estimating site occupancy rates when detection
-probabilities are less than one. Ecology, 83, 2248–2255.</p>
+<p>(2) если вид отсутствует на участке, то следы присутствия не будут обнаружены ни при каких условиях (например,
+   не может быть ложных отнесений следов иного вида к исследуемому виду).</p>
+<p>(3) присутствие следов в одном месте не зависит от присустствия (остуствия) следов в других местах.</p>
+<p>В итоге данные обследования по каждому участку сводятся в последовательность нулей и единиц, где 1 означает, что
+вид был обнаружен, а 0 -- не обнаружен. Каждому обседованному участку в конце периода исследований
+прописывается такая последовательность обнаружений/не-обнаружений.</p>
+<h2>Основная модель</h2>
+<p>Модель очень проста и легче всего ее пояснить на примере. Предположим, что в было всего 5 этапов обследований участков. Предположим,
+что на некотором учаске номер <span class="math">\(i\)</span> была зафиксирована следующая история наблюдений: 01010. Тогда вероятность получить данную историю
+наблюдений равняется:</p>
+<div class="math">$$
+\psi_i (1-p_{i1})p_{i2}(1-p_{i3})p_{i4}(1-p_{i5})
+$$</div>
+<p>В случае, когда на участке не было ни одного обнаружения следов вида за всю историю наблюдений (в нашем пример -- пять нулей, 00000),
+возможны варианты: (а) животных там и в самом деле нет (б) животных попросту не удалось обнаружить. Поэтому если на участке <span class="math">\(k\)</span> не было
+ни одного обнаружения, то вероятность получить такую историю наблюдений равняется:</p>
+<div class="math">$$
+\psi_k \prod_{t=1}^5 (1 - p_{kt}) + (1-\psi_k).
+$$</div>
+<p>Подобным же образом строятся вероятности получить наблюдаемые истории присутствия следов в общем случае. Однако, полученная модель
+будет иметь слишком много параметров, чтобы ее можно было оценить по имеющимся наблюдениям, поэтому модель необходимо упростить.
+Наиболее простой вариант -- предположить, что вероятность присутствия вида и обнаружения следов являются константами. В этом
+случае  можно построить функцию правдоподобия по результатам всех наблюдений на всех участках:</p>
+<div class="math">$$
+L(\psi, \mathbf{p}) = \big[\psi^{n_{o}}\prod_{t=1}^T p^{n_t}_t (1-p_t)^{n_{o} - n_t} \big] \times \big[\psi \prod_{t=1}^T (1-p_t)+ (1-\psi) \big].
+$$</div>
+<p>Таким образом задача сводится к тому, чтобы подобрать такие параметры <span class="math">\(\psi\)</span>, <span class="math">\(p_1, p_2, \dots, p_n\)</span>, которые обеспечивают достижения
+максимума функции <span class="math">\(L\)</span>.</p>
+<h3>Развитие модели</h3>
+<h4>Факторы</h4>
+<p>Логично предположить, что вероятность присутсвия вида на некотором участке зависит от неких геоэкологических факторов. Аналогично,
+вероятность обнаружения также может меняться в зависимости от определенных параметров, например, погодных. Такие факторы
+могут быть встроены в модель, например, можно ее расширить при помощи логистической функции -- потребовать, чтобы величина <span class="math">\(\psi\)</span>
+удовлетворяла следующей зависимости от объясняющих факторов <span class="math">\(\mathbf{X}\)</span> и параметров модели <span class="math">\(\mathbf{B}\)</span>:</p>
+<div class="math">$$
+\psi_i = \frac{e^\mathbf{XB}}{1 + e^\mathbf{XB}}.
+$$</div>
+<p>
+Аналогично моделируется величина <span class="math">\(p\)</span>.</p>
+<h4>Отсутсвующие наблюдения</h4>
+<p>Не всегда возможно получить одинаковое количество наблюдений за участками. Например, для какого-либо учатка возможна такая история наблюдений:
+10-11, когда было пропущено третье по счету исследование. В этом случае функция правдоподобия для данного участка будет выглядеть
+следующим образом:</p>
+<div class="math">$$
+\psi p_1 (1-p_2) p_4 p_5.
+$$</div>
+<p>В таком случае, чтобы учесть отсутствующие наблюдения, придется вычислять параметры для каждого участка по отдельности,
+а не в общем виде.</p>
 <script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
@@ -140,6 +181,31 @@ probabilities are less than one. Ecology, 83, 2248–2255.</p>
                     <h1>Other articles</h1>
                     <hr />
                     <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/monitoring-carnivore-populations-at-the-landscape-scale-occupancy-modelling-of-tigers-from-sign-surveys.html" rel="bookmark"
+                           title="Permalink to Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys">Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2020-05-22T00:00:00+03:00">
+                Published: Пт 22 мая 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи
+Karanth, K. U., Gopalaswamy, A. M., Kumar, N. S., Vaidyanathan, S., Nichols, J. D., &amp; MacKenzie, D. I. (2011). Monitoring carnivore populations at the landscape scale: occupancy modelling of tigers from sign surveys. Journal of Applied Ecology, 48(4), 1048-1056.</strong></p>
+<h2>Суть задачи</h2>
+<p>Нужно создать методику оценки ареала …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/monitoring-carnivore-populations-at-the-landscape-scale-occupancy-modelling-of-tigers-from-sign-surveys.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
