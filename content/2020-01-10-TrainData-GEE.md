@@ -1,7 +1,7 @@
 date: 2020-01-10
 title:  Создание обучающих данных в GEE для классификации внешними ресурсами
 tags: Remote Sensing, GEE
-Category: Google EarthEngine tools
+Category: GEE
 
 
 
