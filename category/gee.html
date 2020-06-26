@@ -20,7 +20,153 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/podbor-parametrov-modelei-dlia-gee.html">Подбор параметров моделей для GEE</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/maskirovanie-oblachnosti-dlia-sentinel-2.html">Маскирование облачности для Sentinel-2</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-06-26T00:00:00+03:00">
+                Published: Пт 26 июня 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/clouds.html">Clouds</a> </p>
+</footer><!-- /.post-info --><h2>Суть дела</h2>
+<p>Когда анализируешь космосьемку, то постоянно мучаешься с облаками, которые закрывают
+собой все интересное и мешаются при автоматической обработке.</p>
+<p>При работе с Sentinel-2 можно использовать грубую маску облачности, которая распространяется
+совмесно с самим продуктом: к снимкам добавлен QA канал, содержащий вспмогательную информацию, 
+в частности, по нему можно установить, какие пиксели закрыты облаками. Но данная маска очень
+грубая и качество ее оставляет желать лучшего. </p>
+<p>Гораздо более качественную маску облачности дает инструмент <a href="https://github.com/sentinel-hub/sentinel2-cloud-detector">s2cloudless</a>,
+это пакет Python, предназначенный для поиска облачности на снимках Sentinel-2. Он обеспечивает попискельную
+классификацию и возвращает растр, в пикселях которого записана вероятность того, что данный пиксель -- облако.</p>
+<p>Этот инструмент был разработан на базе машинного обучения, в основе лежит модель градиентного бустинга. Собственно
+сама модель <a href="https://github.com/sentinel-hub/sentinel2-cloud-detector/tree/master/s2cloudless/models">хранится в репозитории</a>,
+а инструмент представляет собой не более чем обертку над библиотекой lightGBM, которая и использует данную модель.</p>
+<p>Все хорошо ровно до тех пор, пока не нужно искать облака в системе, в которую сложновато всунуть посторонюю модель. 
+В частности, для того чтобы добавить возможность поиска облаков на базе этой модели в Google EarthEngine,
+приходится несколько поднапрячься.</p>
+<h2>Как это работает</h2>
+<p>В GEE встроено много возможностей по созданию моделей машинного обучения, но, к сожалению, там не предусмотрен импорт моделей lightGBM.
+Зато в GEE можно подключить модель, написанную на TensorFlow и использовать ее. Поэтому сама собой приходит в голову мысль,
+что можно построить на TensorFlow аппроксимирующую модель -- то есть обучаем новую модель повторять ответы, которые выдает
+инструмент s2cloudless.</p>
+<p>После того, как мы построим на TensorFlow свою модель (в нашем случае -- нейросеть), которая будет с приемлемой точностью
+воспроизводить поведение исходной модели, ее можно будет импортировать в GEE и испльзовать, как обычно.
+Тут сталкиваемся с двумя альтернативами, каждая из которых со своими сложностями:</p>
+<ul>
+<li>мы программируем все на языке Python, затем работаем с GEE тажже через API на питоне; но это не удобно для нас -- у нас большая часть работы завязана на веб-интерфейс GEE;</li>
+<li>мы сохраняем модель TensorFlow, а затем подключаем ее через ee.Model.fromAiPlatformPredictor; это также не удобно -- нужно настраивать AI Platform.</li>
+</ul>
+<p>В итоге получается, что быстрее всего будет воспользоваться <a href="https://code.earthengine.google.com/d0932076572dd95fffed43b0aa716bc8?noload=true">готовой реализацией многослойного перцептрона</a>.
+Эту реализацию я писал несколько лет назад специально под GEE, когда там еще не было возможности подключать внешние модели.
+Поскольку слои перцептрона реализуются довольно просто, достаточно перемножить матрицы весовых коэффициентов и вектор выходов предыдущего слоя сети,
+то трехслойная сеть может быть записана в GEE буквально парой десятков строчек кода:</p>
+<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">basicMLP</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="nx">init</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">weightsList</span><span class="p">,</span> <span class="nx">biasesList</span><span class="p">){</span> 
+    <span class="k">this</span><span class="p">.</span><span class="nx">biases</span> <span class="o">=</span> <span class="nx">biasesList</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">array2Image</span><span class="p">);</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">weights</span> <span class="o">=</span> <span class="nx">weightsList</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">array2Image</span><span class="p">);</span>
+  <span class="p">},</span>
+
+  <span class="nx">output</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">inputArray</span><span class="p">){</span>
+    <span class="cm">/*</span>
+<span class="cm">      Evaluate NNet output for given input &#39;inputArray&#39;</span>
+
+<span class="cm">        inputArray: ee.Array of NNet input values.</span>
+<span class="cm">    */</span>
+    <span class="kd">var</span> <span class="nx">l1</span> <span class="o">=</span> <span class="nx">inputArray</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">0</span><span class="p">))));</span>
+    <span class="nx">l1</span> <span class="o">=</span> <span class="nx">relu</span><span class="p">(</span><span class="nx">l1</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">0</span><span class="p">))));</span>
+
+    <span class="kd">var</span> <span class="nx">l2</span> <span class="o">=</span> <span class="nx">l1</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">1</span><span class="p">))));</span>
+    <span class="nx">l2</span> <span class="o">=</span> <span class="nx">relu</span><span class="p">(</span><span class="nx">l2</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">1</span><span class="p">))));</span>
+
+    <span class="kd">var</span> <span class="nx">l3</span> <span class="o">=</span> <span class="nx">l2</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">2</span><span class="p">))));</span>
+    <span class="nx">l3</span> <span class="o">=</span> <span class="nx">l3</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">2</span><span class="p">)));</span>
+
+    <span class="k">return</span> <span class="nx">l3</span><span class="p">;</span>
+  <span class="p">}</span>
+</pre></div>
+
+
+<p>Итак, порядок действий таков:</p>
+<ol>
+<li>Обучаем перцептрон под TensorFlow.</li>
+<li>Экспортируем коэффициенты нейронной сети.</li>
+<li>Импортируем коэффициенты в GEE и подключаем их к многослойному перцептрону.</li>
+</ol>
+<h2>Детали реализации</h2>
+<p>Построение модели на TensorFlow производилось следующим кодом:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">lightgbm</span> <span class="kn">import</span> <span class="n">Booster</span>
+<span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+
+<span class="c1"># Читаем модель</span>
+<span class="n">bst</span> <span class="o">=</span> <span class="n">Booster</span><span class="p">(</span><span class="n">model_file</span><span class="o">=</span><span class="s1">&#39;lightGBM.model&#39;</span><span class="p">)</span>
+
+<span class="c1"># генерируем обучающее множество</span>
+<span class="k">def</span> <span class="nf">batch</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">bst</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span> <span class="o">*</span> <span class="n">scale</span>
+    <span class="n">pred</span> <span class="o">=</span> <span class="n">bst</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">pred</span>
+
+
+<span class="c1"># Строим сеть</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Sequential</span><span class="p">([</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;relu&#39;</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="p">)),</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;relu&#39;</span><span class="p">),</span>
+    <span class="c1"># tf.keras.layers.Dropout(0.2),</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;sigmoid&#39;</span><span class="p">,</span> <span class="p">),</span>
+<span class="p">])</span>
+<span class="n">net</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">optimizer</span><span class="o">=</span><span class="s1">&#39;adam&#39;</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="s1">&#39;mse&#39;</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mae&#39;</span><span class="p">])</span>
+<span class="n">net</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="c1"># Собственно обучение</span>
+<span class="n">EPOCHS</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">batch</span><span class="p">(</span><span class="mi">500000000</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">net</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="n">EPOCHS</span><span class="p">,</span> <span class="n">validation_split</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+
+<p>В результате была построена следующая сеть и были получены следующие оценки ее точности:</p>
+<div class="highlight"><pre><span></span><span class="gh">Layer (type)                 Output Shape              Param #   </span>
+<span class="gh">=================================================================</span>
+<span class="gh">dense (Dense)                (None, 50)                550       </span>
+<span class="gh">_________________________________________________________________</span>
+<span class="gh">dense_1 (Dense)              (None, 50)                2550      </span>
+<span class="gh">_________________________________________________________________</span>
+<span class="gh">dense_2 (Dense)              (None, 1)                 51        </span>
+<span class="gh">=================================================================</span>
+Total params: 3,151
+Trainable params: 3,151
+<span class="gh">Non-trainable params: 0</span>
+<span class="gh">_________________________________________________________________</span>
+Train on 475000000 samples, validate on 25000000 samples
+Epoch 1/1
+475000000/475000000 [==============================] - 23026s 48us/step - loss: 0.0049 - mean_absolute_error: 0.0298 - val_loss: 0.0044 - val_mean_absolute_error: 0.0285
+</pre></div>
+
+
+<p>Таким образом буквально несколько строк позволили построить на базе исходного 
+аналогичный детектор облачности, отличающийся от первоначального приблизительно на плюс-минус три процента.</p>
+<p>Результирующий инструмент можно посмотреть:</p>
+<ul>
+<li>собственно <a href="https://code.earthengine.google.com/68c182c59bfefe05479539cb7015f9eb?noload=true">код детектора</a> и <a href="https://code.earthengine.google.com/fee34a8031983d0d6cb03638012dc7d0?noload=true">коэффиценты сети</a>;</li>
+<li><a href="https://code.earthengine.google.com/8410e65b4bf52bdc0a6261a9c442ea99">пример использования</a>;</li>
+</ul>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/podbor-parametrov-modelei-dlia-gee.html" rel="bookmark"
+                           title="Permalink to Подбор параметров моделей для GEE">Подбор параметров моделей для GEE</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-01-18T00:00:00+03:00">
                 Published: Сб 18 января 2020
@@ -31,288 +177,13 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> </p>
-</footer><!-- /.post-info --><p>Google EarthEngine позволяет быстро строить модели для обработки данных ДЗЗ, но в текущей версии GEE нет каких-либо
+</footer><!-- /.post-info -->                <p>Google EarthEngine позволяет быстро строить модели для обработки данных ДЗЗ, но в текущей версии GEE нет каких-либо
 функций, которые обеспечвают поиск оптимальных параметров моделей. Возможно, они появятся позднее (GEE очень быстро
 развивается), но сейчас приходится выкручиваться самостоятельно.</p>
-<p>Пока самый простой в реализации способ из обнаруженных -- подбор параметров внешним скриптом. Общая идея такова:</p>
-<ul>
-<li>пишется модель на Python API, которая выполняет нужные нам действия;</li>
-<li>модель оборачивается в функцию, которая принимает на вход параметры модели или в отдельный скрипт,
-   который принимает параметры из командной строки и затем вызвается из нее;</li>
-<li>строится цикл, состоящий из процедур обучения модели и проверки качества ее работы; в этом цикле по той
-   или иной схеме перебираются параметры модели; самый простой вариант -- поиск параметров на решетке, но
-   можно и заморочиться тем, что скрипт закидывается в специальный софт для оптимизации.</li>
-</ul>
-<p>Ниже на примере подбора параметров случайного леса.</p>
-<h1>Предварительные действия</h1>
-<p>Необходимо сначала:</p>
-<ul>
-<li>установить Python API, процедура хорошо описана в <a href="https://developers.google.com/earth-engine/python_install">официальной документации</a>, нет смысла повторяться;</li>
-<li>получить ключ доступа к движку GEE, выполнив из командной строки:</li>
-</ul>
-<div class="highlight"><pre><span></span>earthengine authenticate
-</pre></div>
-
-
-<p>появится поле ввода и ссылка, по которой нужно перейти, а затем ввести ключ в поле ввода;</p>
-<ul>
-<li>в любом скрипте, в котором будет происходить работа с GEE нужно будет перед началом всех действий инициализировать GEE; простейший пример:</li>
-</ul>
-<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ee</span>
-
-<span class="c1"># Initialize the Earth Engine module.</span>
-<span class="n">ee</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
-
-<span class="c1"># Print metadata for a DEM dataset.</span>
-<span class="k">print</span><span class="p">(</span><span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="s1">&#39;USGS/SRTMGL1_003&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">())</span>
-</pre></div>
-
-
-<h1>Подбор параметров модели</h1>
-<p>Готовый к использованию код лежит в <a href="https://gitlab.com/nextgis_private/gee_ural/tree/master/scripts">репозитории</a>. Ниже описываются
-лишь основные моменты, необходимые для понимания, но нужно учитывать, что
-в исходном коде из репозитория есть детали, не влияющие на прицнип, но внесенные в код из практических соображений использования.</p>
-<p>Вся система состоит из двух файлов:</p>
-<ul>
-<li>trainner.py: файл-обертка над функциями обучения, содержит процедуру подбора параметров, оформлено все в виде утилиты командной строки;</li>
-<li>utils.py: файл содержит основные функции (описание моделей, расчет точности и т.п.).</li>
-</ul>
-<h2>Модель и оценка точности</h2>
-<p>Данные функции определяются в файле utils.py</p>
-<h3>Описание классификатора</h3>
-<p>Алгоритм случайного леса строит <span class="math">\(B\)</span> деревьев, каждое из которых в классическом варианте конструируются по следующей схеме:</p>
-<p><img alt="RandomForest" src="images/2020-01-18/RandomForest.png" title="Построение случайного леса" width="70%"></p>
-<p>Модель случайного леса, используемая в GEE содержит следующие настраиваемые параметры:</p>
-<ul>
-<li>numberOfTrees: число деревьев, используемых при построении леса (величина <span class="math">\(B\)</span> в обозначениях алгоритма);</li>
-<li>variablesperSplit: число переменных, участвующих в разбиении пространства признаков при построении леса (величина <span class="math">\(m\)</span> в обозначениях алгоритма);</li>
-<li>minLeafPopulation: разбиение прекращается при достижении данного числа объектов в узле дерева (величина <span class="math">\(n_{min}\)</span>);</li>
-<li>bagFraction: доля примеров, используемых при построении дерева, по отношению к общему числу имеющихся примеров;</li>
-<li>outOfBagMode: использовать ли при построении леса режим "out of bag"; при этом режиме точность классификатора на примере номер <span class="math">\(i\)</span> оценивается только по тем
-  деревьям, в обучении которых данный пример не учавствовал; режим позволяет одновременно обучать и производить перекрестную проверку обучения (дает
-  возможность не переобучаться, но за счет значительного замедления процедуры обучения);</li>
-<li>seed: настройка датчика случайных чисел.</li>
-</ul>
-<p>Собственно сама функция, обеспечивающая построения классификатора выглядит следующим образом:</p>
-<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">numberOfTrees</span><span class="p">,</span> <span class="n">variablesPerSplit</span><span class="p">,</span> <span class="n">minLeafPopulation</span><span class="p">,</span> <span class="n">bagFraction</span><span class="p">,</span> <span class="n">outOfBagMode</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">collection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">):</span>
-  <span class="n">classifier</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Classifier</span><span class="o">.</span><span class="n">randomForest</span><span class="p">(</span>
-    <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">numberOfTrees</span><span class="p">,</span>
-    <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">variablesPerSplit</span><span class="p">,</span>
-    <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">minLeafPopulation</span><span class="p">,</span>
-    <span class="n">bagFraction</span><span class="o">=</span><span class="n">bagFraction</span><span class="p">,</span>
-    <span class="n">outOfBagMode</span><span class="o">=</span><span class="n">outOfBagMode</span><span class="p">,</span>
-    <span class="n">seed</span><span class="o">=</span><span class="n">seed</span>
-  <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">)</span>
-  <span class="k">return</span> <span class="n">classifier</span>
-</pre></div>
-
-
-<p>Она принимает на вход</p>
-<ul>
-<li>параметры классификатора,</li>
-<li>коллекцию обучающих примеров (collection),</li>
-<li>название поля, содержащего метку класса (classname),</li>
-<li>список полей (числовых), которые будут использоваться при обучении (names).</li>
-</ul>
-<p>Результатом работы функции является обученный классификатор.</p>
-<h3>Оценка точности классификатора</h3>
-<p>Точность можно оценивать различными способами, в данном примере показано, как можно
-оценить точность и величину Kappa на обучающем и тестовом множествах.</p>
-<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">getQuality</span><span class="p">(</span><span class="n">classifier</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="n">classname</span><span class="p">):</span>
-  <span class="n">trainAccuracyMatr</span> <span class="o">=</span> <span class="n">classifier</span><span class="o">.</span><span class="n">confusionMatrix</span><span class="p">();</span>
-  <span class="n">trainAcc</span> <span class="o">=</span> <span class="n">trainAccuracyMatr</span><span class="o">.</span><span class="n">accuracy</span><span class="p">();</span>
-  <span class="n">trainKappa</span> <span class="o">=</span> <span class="n">trainAccuracyMatr</span><span class="o">.</span><span class="n">kappa</span><span class="p">();</span>
-
-  <span class="n">testAnswers</span> <span class="o">=</span> <span class="n">testCollection</span><span class="o">.</span><span class="n">classify</span><span class="p">(</span><span class="n">classifier</span><span class="p">);</span>
-  <span class="n">testAccuracyMatr</span> <span class="o">=</span> <span class="n">testAnswers</span><span class="o">.</span><span class="n">errorMatrix</span><span class="p">(</span><span class="n">classname</span><span class="p">,</span> <span class="s1">&#39;classification&#39;</span><span class="p">);</span>
-  <span class="n">testAcc</span> <span class="o">=</span> <span class="n">testAccuracyMatr</span><span class="o">.</span><span class="n">accuracy</span><span class="p">();</span>
-  <span class="n">testKappa</span> <span class="o">=</span> <span class="n">testAccuracyMatr</span><span class="o">.</span><span class="n">kappa</span><span class="p">();</span>
-
-  <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">trainAcc</span><span class="o">=</span><span class="n">trainAcc</span><span class="p">,</span> <span class="n">trainKappa</span><span class="o">=</span><span class="n">trainKappa</span><span class="p">,</span> <span class="n">testAcc</span><span class="o">=</span><span class="n">testAcc</span><span class="p">,</span> <span class="n">testKappa</span><span class="o">=</span><span class="n">testKappa</span><span class="p">,</span> <span class="n">testErrMatr</span><span class="o">=</span><span class="n">testAccuracyMatr</span><span class="p">)</span>
-</pre></div>
-
-
-<p>Функция берет на вход обученный классификатор и тестовое множество, а возвращает словарь значений:</p>
-<ul>
-<li>trainAcc: точность на обучающем множестве,</li>
-<li>trainKappa: Kappa на тестовом множестве,</li>
-<li>testAcc: точность на тестовом множестве,</li>
-<li>testKappa: Kappa на тестовом множестве,</li>
-<li>testErrMatr: матрица ошибок на тестовом множестве.</li>
-</ul>
-<p>В этой функции жестко прописано название поля, содержащего результаты классификации "classification".
-По-хорошему его нужно вынести в параметры функции, но это название генерируется автоматически самим классификатором
-и оно оставлено, чтобы не слишком заморачиваться с числом пробрасываемых сквозь функции параметров.</p>
-<h3>Обучение и оценка</h3>
-<p>Объединение описанных выше шагов в одну функцию для удбства работы:</p>
-<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">testCase</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">trainCollection</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-  <span class="n">classifier</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span>
-    <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;numberOfTrees&#39;</span><span class="p">],</span>
-    <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;variablesPerSplit&#39;</span><span class="p">],</span>
-    <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">],</span>
-    <span class="n">bagFraction</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;bagFraction&#39;</span><span class="p">],</span>
-    <span class="n">outOfBagMode</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;outOfBagMode&#39;</span><span class="p">],</span>
-    <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
-    <span class="n">collection</span><span class="o">=</span><span class="n">trainCollection</span><span class="p">,</span> <span class="n">classname</span><span class="o">=</span><span class="n">classname</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="n">names</span>
-  <span class="p">)</span>
-  <span class="n">classified</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">classify</span><span class="p">(</span><span class="n">classifier</span><span class="p">)</span>
-  <span class="n">qual</span> <span class="o">=</span> <span class="n">getQuality</span><span class="p">(</span><span class="n">classifier</span><span class="p">,</span> <span class="n">testCollection</span><span class="p">,</span> <span class="s1">&#39;Class&#39;</span><span class="p">)</span>
-  <span class="n">test</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">qual</span><span class="p">[</span><span class="s1">&#39;trainKappa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getInfo</span><span class="p">(),</span> <span class="n">qual</span><span class="p">[</span><span class="s1">&#39;testKappa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
-
-  <span class="k">return</span> <span class="n">test</span><span class="p">,</span> <span class="n">val</span>
-</pre></div>
-
-
-<p>Функция обучает классикатор на заданных параметрах, которые передаются в виде словаря значений, и возвращает два числа -- Kappa на тестовом и обучающем множествах.</p>
-<p>В этой функции жестко прописано название поля с меткой класса ("Class"), по-хорошему, нужно вынести его в параметры функции.
-(Но оставлено по принципу "и так сойдет")</p>
-<h2>Подбор параметров</h2>
-<p>Подбор параметров был сделан в отдельном скрипте, оформленном в виде утилиты командной строки.</p>
-<p>Основой скрипта является функция main, которая производит в цикле процедуру перебора параметров и
-оценки точности классификаторов для этих параметров на обучающем и тестовом множествах.</p>
-<h3>Функция подбора параметров</h3>
-<p>Функция принимает на вход следующие параметры:</p>
-<ul>
-<li>название векторного слоя обучающего множества примеров;</li>
-<li>название векторного слоя тестового множества;</li>
-<li>название растра, который требуется классифицировать; каналы растра -- признаки, использующиеся
-  при классификации;</li>
-<li>название файла формата CSV, в который будут писаться результаты (параметры и точность, достигнутая
-  на этих параметрах);</li>
-</ul>
-<p>В этой функции жестко прописано название поля с меткой класса ("Class"), по-хорошему, нужно вынести его в параметры функции.
-(Но оставлено по принципу "и так сойдет"). Поле 'system:index' генерируется автоматически GEE и не несет никакой смысловой
-нагрузки, поэтому удаляется сразу же.</p>
-<p>Вообще в этой функции много жестко зашитых параметров (число проверямых деревьев, число листьев и т.п.), но
-этот скрипт используется в экспериментов, поэтому все эти параметры правятся по необходимости и под каждую задачу.
-Поэтому (ИМХО) нет большого смысла их параметризовывать и выносить их вовне.</p>
-<p>Функция пробегает по решетке параметров и для каждого набора строит классификатор, а затем оценивает его точность.
-При необходимости можно перестроить шаг по каждому из параметров.</p>
-<p>Важно отметить, что тут во всех классификаторах используется параметр <code>outOfBagMode=False</code>, это позволяет ускорить
-процесс работы (хотя и повысить шансы на переобучение).</p>
-<p>Кроме того, в случае, когда используется большое число каналов в растре и строится сложный классификатор (число деревьев, листьев),
-то может возникнуть ошибка таймаута GEE. В этом случае возникает ошибка <code>ee.EEException</code>, которая отлавливается и игнорируется (с
-записью в лог соотвествующего сообщения).</p>
-<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">landTrain</span><span class="p">,</span> <span class="n">landVal</span><span class="p">,</span> <span class="n">dataSetName</span><span class="p">,</span> <span class="n">resultCSV</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-    <span class="c1"># Список полей, используемых для обучения:</span>
-    <span class="n">NAMES</span> <span class="o">=</span> <span class="n">landTrain</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">propertyNames</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;system:index&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;Class&#39;</span><span class="p">)</span>
-    <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">NAMES</span><span class="o">.</span><span class="n">getInfo</span><span class="p">())</span>
-
-    <span class="n">image</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">dataSetName</span><span class="p">);</span>
-
-    <span class="c1"># Собираем список из количества переменных, для которых будут строиться классификаторы</span>
-    <span class="n">variable_counts</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">[</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">count</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">]])</span> <span class="o">-</span> <span class="nb">set</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
-    <span class="n">variable_counts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">variable_counts</span><span class="p">)</span>
-    <span class="n">variable_counts</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
-
-
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">resultCSV</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">csvfile</span><span class="p">:</span>
-        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">csvfile</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;trainKappa&#39;</span><span class="p">,</span> <span class="s1">&#39;valKappa&#39;</span><span class="p">,</span> <span class="s1">&#39;numberOfTrees&#39;</span><span class="p">,</span> <span class="s1">&#39;variablesperSplit&#39;</span><span class="p">,</span> <span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">,</span> <span class="s1">&#39;bagFraction&#39;</span><span class="p">]</span>
-        <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">numberOfTrees</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">500</span><span class="p">]:</span>
-          <span class="k">for</span> <span class="n">variablesPerSplit</span> <span class="ow">in</span> <span class="n">variable_counts</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">minLeafPopulation</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">300</span><span class="p">]:</span>
-              <span class="k">for</span> <span class="n">bagFraction</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]:</span>
-                <span class="n">params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-                  <span class="n">numberOfTrees</span><span class="o">=</span><span class="n">numberOfTrees</span><span class="p">,</span>
-                  <span class="n">variablesPerSplit</span><span class="o">=</span><span class="n">variablesPerSplit</span><span class="p">,</span>
-                  <span class="n">minLeafPopulation</span><span class="o">=</span><span class="n">minLeafPopulation</span><span class="p">,</span>
-                  <span class="n">bagFraction</span><span class="o">=</span><span class="n">bagFraction</span><span class="p">,</span>
-                  <span class="n">outOfBagMode</span><span class="o">=</span><span class="kc">False</span>
-                <span class="p">)</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">trainKappa</span><span class="p">,</span> <span class="n">valKappa</span> <span class="o">=</span> <span class="n">testCase</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">landTrain</span><span class="p">,</span> <span class="n">landVal</span><span class="p">,</span> <span class="s1">&#39;Class&#39;</span><span class="p">,</span> <span class="n">NAMES</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
-                    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">trainKappa</span><span class="p">,</span> <span class="n">valKappa</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;numberOfTrees&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;variablesPerSplit&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;minLeafPopulation&#39;</span><span class="p">],</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;bagFraction&#39;</span><span class="p">]]</span>
-                    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-                        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-                    <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">data</span><span class="p">])</span>
-                <span class="k">except</span> <span class="n">ee</span><span class="o">.</span><span class="n">EEException</span><span class="p">:</span>
-                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;En error occurs for </span><span class="si">%s</span><span class="s1"> params for </span><span class="si">%s</span><span class="s1"> dataset&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">dataSetName</span><span class="p">))</span>
-</pre></div>
-
-
-<h3>Итоговый скрипт и его использование</h3>
-<p>Собственно весь скрипт представляет собой обертку над функцией main: основная часть скрипта -- это анализ параметров командной строки (входные слои, выходной файл).
-Детали реализации скрипта можно посмотреть в репозитории.</p>
-<p>А использование скрипта выглядит примерно так:</p>
-<div class="highlight"><pre><span></span>python trainner.py <span class="se">\</span>
-       --train <span class="s2">&quot;users/kolesovdm/Steppe/set13Train&quot;</span> <span class="se">\</span>
-       --val <span class="s2">&quot;users/kolesovdm/Steppe/set13Val&quot;</span> <span class="se">\</span>
-       --image <span class="s2">&quot;users/kolesovdm/Steppe/dataSet13&quot;</span> <span class="se">\</span>
-       --result <span class="s2">&quot;set13.csv&quot;</span>
-</pre></div>
-
-
-<p>где train -- векторный слой обучающих примеров, val -- векторный слой тестовых примеров, image -- изображение для классификации, result -- куда сохранить параметры и точность, достигаемую на них.</p>
-<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
-    var align = "center",
-        indent = "0em",
-        linebreak = "false";
-
-    if (false) {
-        align = (screen.width < 768) ? "left" : align;
-        indent = (screen.width < 768) ? "0em" : indent;
-        linebreak = (screen.width < 768) ? 'true' : linebreak;
-    }
-
-    var mathjaxscript = document.createElement('script');
-    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
-    mathjaxscript.type = 'text/javascript';
-    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
-
-    var configscript = document.createElement('script');
-    configscript.type = 'text/x-mathjax-config';
-    configscript[(window.opera ? "innerHTML" : "text")] =
-        "MathJax.Hub.Config({" +
-        "    config: ['MMLorHTML.js']," +
-        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
-        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
-        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
-        "    displayAlign: '"+ align +"'," +
-        "    displayIndent: '"+ indent +"'," +
-        "    showMathMenu: true," +
-        "    messageStyle: 'normal'," +
-        "    tex2jax: { " +
-        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
-        "        displayMath: [ ['$$','$$'] ]," +
-        "        processEscapes: true," +
-        "        preview: 'TeX'," +
-        "    }, " +
-        "    'HTML-CSS': { " +
-        "        availableFonts: ['STIX', 'TeX']," +
-        "        preferredFont: 'STIX'," +
-        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
-        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
-        "    }, " +
-        "}); " +
-        "if ('default' !== 'default') {" +
-            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-        "}";
-
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
-}
-</script>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>Пока самый простой в реализации способ из обнаруженных -- подбор параметров внешним скриптом. Общая …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/podbor-parametrov-modelei-dlia-gee.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>

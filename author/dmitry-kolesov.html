@@ -20,7 +20,153 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/estimating-site-occupancy-rates-when-detection-probabilities-are-less-than-on.html">Estimating site occupancy rates when detection probabilities are less than on</a></h1>
+                    <h1 class="entry-title"><a href="https://kolesovdmitry.github.io/logbook/maskirovanie-oblachnosti-dlia-sentinel-2.html">Маскирование облачности для Sentinel-2</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2020-06-26T00:00:00+03:00">
+                Published: Пт 26 июня 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/clouds.html">Clouds</a> </p>
+</footer><!-- /.post-info --><h2>Суть дела</h2>
+<p>Когда анализируешь космосьемку, то постоянно мучаешься с облаками, которые закрывают
+собой все интересное и мешаются при автоматической обработке.</p>
+<p>При работе с Sentinel-2 можно использовать грубую маску облачности, которая распространяется
+совмесно с самим продуктом: к снимкам добавлен QA канал, содержащий вспмогательную информацию, 
+в частности, по нему можно установить, какие пиксели закрыты облаками. Но данная маска очень
+грубая и качество ее оставляет желать лучшего. </p>
+<p>Гораздо более качественную маску облачности дает инструмент <a href="https://github.com/sentinel-hub/sentinel2-cloud-detector">s2cloudless</a>,
+это пакет Python, предназначенный для поиска облачности на снимках Sentinel-2. Он обеспечивает попискельную
+классификацию и возвращает растр, в пикселях которого записана вероятность того, что данный пиксель -- облако.</p>
+<p>Этот инструмент был разработан на базе машинного обучения, в основе лежит модель градиентного бустинга. Собственно
+сама модель <a href="https://github.com/sentinel-hub/sentinel2-cloud-detector/tree/master/s2cloudless/models">хранится в репозитории</a>,
+а инструмент представляет собой не более чем обертку над библиотекой lightGBM, которая и использует данную модель.</p>
+<p>Все хорошо ровно до тех пор, пока не нужно искать облака в системе, в которую сложновато всунуть посторонюю модель. 
+В частности, для того чтобы добавить возможность поиска облаков на базе этой модели в Google EarthEngine,
+приходится несколько поднапрячься.</p>
+<h2>Как это работает</h2>
+<p>В GEE встроено много возможностей по созданию моделей машинного обучения, но, к сожалению, там не предусмотрен импорт моделей lightGBM.
+Зато в GEE можно подключить модель, написанную на TensorFlow и использовать ее. Поэтому сама собой приходит в голову мысль,
+что можно построить на TensorFlow аппроксимирующую модель -- то есть обучаем новую модель повторять ответы, которые выдает
+инструмент s2cloudless.</p>
+<p>После того, как мы построим на TensorFlow свою модель (в нашем случае -- нейросеть), которая будет с приемлемой точностью
+воспроизводить поведение исходной модели, ее можно будет импортировать в GEE и испльзовать, как обычно.
+Тут сталкиваемся с двумя альтернативами, каждая из которых со своими сложностями:</p>
+<ul>
+<li>мы программируем все на языке Python, затем работаем с GEE тажже через API на питоне; но это не удобно для нас -- у нас большая часть работы завязана на веб-интерфейс GEE;</li>
+<li>мы сохраняем модель TensorFlow, а затем подключаем ее через ee.Model.fromAiPlatformPredictor; это также не удобно -- нужно настраивать AI Platform.</li>
+</ul>
+<p>В итоге получается, что быстрее всего будет воспользоваться <a href="https://code.earthengine.google.com/d0932076572dd95fffed43b0aa716bc8?noload=true">готовой реализацией многослойного перцептрона</a>.
+Эту реализацию я писал несколько лет назад специально под GEE, когда там еще не было возможности подключать внешние модели.
+Поскольку слои перцептрона реализуются довольно просто, достаточно перемножить матрицы весовых коэффициентов и вектор выходов предыдущего слоя сети,
+то трехслойная сеть может быть записана в GEE буквально парой десятков строчек кода:</p>
+<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">basicMLP</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="nx">init</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">weightsList</span><span class="p">,</span> <span class="nx">biasesList</span><span class="p">){</span> 
+    <span class="k">this</span><span class="p">.</span><span class="nx">biases</span> <span class="o">=</span> <span class="nx">biasesList</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">array2Image</span><span class="p">);</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">weights</span> <span class="o">=</span> <span class="nx">weightsList</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">array2Image</span><span class="p">);</span>
+  <span class="p">},</span>
+
+  <span class="nx">output</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">inputArray</span><span class="p">){</span>
+    <span class="cm">/*</span>
+<span class="cm">      Evaluate NNet output for given input &#39;inputArray&#39;</span>
+
+<span class="cm">        inputArray: ee.Array of NNet input values.</span>
+<span class="cm">    */</span>
+    <span class="kd">var</span> <span class="nx">l1</span> <span class="o">=</span> <span class="nx">inputArray</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">0</span><span class="p">))));</span>
+    <span class="nx">l1</span> <span class="o">=</span> <span class="nx">relu</span><span class="p">(</span><span class="nx">l1</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">0</span><span class="p">))));</span>
+
+    <span class="kd">var</span> <span class="nx">l2</span> <span class="o">=</span> <span class="nx">l1</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">1</span><span class="p">))));</span>
+    <span class="nx">l2</span> <span class="o">=</span> <span class="nx">relu</span><span class="p">(</span><span class="nx">l2</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">1</span><span class="p">))));</span>
+
+    <span class="kd">var</span> <span class="nx">l3</span> <span class="o">=</span> <span class="nx">l2</span><span class="p">.</span><span class="nx">matrixMultiply</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nx">Image</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">weights</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">2</span><span class="p">))));</span>
+    <span class="nx">l3</span> <span class="o">=</span> <span class="nx">l3</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">ee</span><span class="p">.</span><span class="nb">Array</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">biases</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">2</span><span class="p">)));</span>
+
+    <span class="k">return</span> <span class="nx">l3</span><span class="p">;</span>
+  <span class="p">}</span>
+</pre></div>
+
+
+<p>Итак, порядок действий таков:</p>
+<ol>
+<li>Обучаем перцептрон под TensorFlow.</li>
+<li>Экспортируем коэффициенты нейронной сети.</li>
+<li>Импортируем коэффициенты в GEE и подключаем их к многослойному перцептрону.</li>
+</ol>
+<h2>Детали реализации</h2>
+<p>Построение модели на TensorFlow производилось следующим кодом:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">lightgbm</span> <span class="kn">import</span> <span class="n">Booster</span>
+<span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+
+<span class="c1"># Читаем модель</span>
+<span class="n">bst</span> <span class="o">=</span> <span class="n">Booster</span><span class="p">(</span><span class="n">model_file</span><span class="o">=</span><span class="s1">&#39;lightGBM.model&#39;</span><span class="p">)</span>
+
+<span class="c1"># генерируем обучающее множество</span>
+<span class="k">def</span> <span class="nf">batch</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">bst</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span> <span class="o">*</span> <span class="n">scale</span>
+    <span class="n">pred</span> <span class="o">=</span> <span class="n">bst</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">pred</span>
+
+
+<span class="c1"># Строим сеть</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Sequential</span><span class="p">([</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;relu&#39;</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="p">)),</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;relu&#39;</span><span class="p">),</span>
+    <span class="c1"># tf.keras.layers.Dropout(0.2),</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">&#39;sigmoid&#39;</span><span class="p">,</span> <span class="p">),</span>
+<span class="p">])</span>
+<span class="n">net</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">optimizer</span><span class="o">=</span><span class="s1">&#39;adam&#39;</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="s1">&#39;mse&#39;</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mae&#39;</span><span class="p">])</span>
+<span class="n">net</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="c1"># Собственно обучение</span>
+<span class="n">EPOCHS</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">batch</span><span class="p">(</span><span class="mi">500000000</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">net</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="n">EPOCHS</span><span class="p">,</span> <span class="n">validation_split</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+
+<p>В результате была построена следующая сеть и были получены следующие оценки ее точности:</p>
+<div class="highlight"><pre><span></span><span class="gh">Layer (type)                 Output Shape              Param #   </span>
+<span class="gh">=================================================================</span>
+<span class="gh">dense (Dense)                (None, 50)                550       </span>
+<span class="gh">_________________________________________________________________</span>
+<span class="gh">dense_1 (Dense)              (None, 50)                2550      </span>
+<span class="gh">_________________________________________________________________</span>
+<span class="gh">dense_2 (Dense)              (None, 1)                 51        </span>
+<span class="gh">=================================================================</span>
+Total params: 3,151
+Trainable params: 3,151
+<span class="gh">Non-trainable params: 0</span>
+<span class="gh">_________________________________________________________________</span>
+Train on 475000000 samples, validate on 25000000 samples
+Epoch 1/1
+475000000/475000000 [==============================] - 23026s 48us/step - loss: 0.0049 - mean_absolute_error: 0.0298 - val_loss: 0.0044 - val_mean_absolute_error: 0.0285
+</pre></div>
+
+
+<p>Таким образом буквально несколько строк позволили построить на базе исходного 
+аналогичный детектор облачности, отличающийся от первоначального приблизительно на плюс-минус три процента.</p>
+<p>Результирующий инструмент можно посмотреть:</p>
+<ul>
+<li>собственно <a href="https://code.earthengine.google.com/68c182c59bfefe05479539cb7015f9eb?noload=true">код детектора</a> и <a href="https://code.earthengine.google.com/fee34a8031983d0d6cb03638012dc7d0?noload=true">коэффиценты сети</a>;</li>
+<li><a href="https://code.earthengine.google.com/8410e65b4bf52bdc0a6261a9c442ea99">пример использования</a>;</li>
+</ul>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://kolesovdmitry.github.io/logbook/estimating-site-occupancy-rates-when-detection-probabilities-are-less-than-on.html" rel="bookmark"
+                           title="Permalink to Estimating site occupancy rates when detection probabilities are less than on">Estimating site occupancy rates when detection probabilities are less than on</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2020-06-18T00:00:00+03:00">
                 Published: Чт 18 июня 2020
@@ -31,156 +177,15 @@
         </address>
 <p>In <a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a>.</p>
 <p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/occupancy-models.html">Occupancy models</a> </p>
-</footer><!-- /.post-info --><p><strong>Обзор основных методов статьи
+</footer><!-- /.post-info -->                <p><strong>Обзор основных методов статьи
 <a href="https://projects.ncsu.edu/cals/course/zo501/2016%20Sampling%20Lab/MacKenzie%202002.pdf">MacKenzie, D.I., Nichols, J.D., Lachman, G.B., Droege, S., Royle, J.A. &amp;
 Langtimm, C.A. (2002) Estimating site occupancy rates when detection probabilities are less than one. Ecology, 83, 2248–2255.</a>
 </strong></p>
 <h2>Вводная часть</h2>
-<p>Ранее уже рассматривалось несколько работ, посвященных оценке ореала животных по следам присустствия. 
-Значительная часть исследований
-в данной тематике ссылается на статью MacKenzie с соавторами, следует предложенной в ней методике или расширяет ее.</p>
-<p>Указанная работа описывает подход для оценки пропорции местообитаний, занятых исследуемым животным,
-при этом важно отметить, что изначально авторы занимались земноводными и обследовали озера/болота,
-поэтому описанная ими методика -- дискретная, точнее, сбор данных происходит в дискретном пространстве:
-пространство естественным образом разбито на ограниченные участки (озера), для которых возможно только два
-варианта событий -- в озере либо найдены следы присутствия вида, либо не найдены.</p>
-<p>При сборе данных о присутсвии вида нужно учитывать возможность того, что даже если вид присутствует
-на территории, то следы его присуствия могут быть пропущены при сборе данных по тем или иным причинам,
-другими словами вероятность детекции вида представляет собой величину, меньшую единицы, даже при условии того,
-что вид присутсвует.</p>
-<p>MacKenzie и соавторы исходят из посылки, что если вероятность обнаружения следов меньше единицы,
-то неоднократным повторением обследования одного и того же места (но в разные периоды времени) можно
-получить оценку вероятности обнаружения следов. А зная данную оценку, можно выйти на оценку доли занятых
-видом мест среди всех обследованных потенциальных местообитаний.
-Статья MacKenzie et al. описывает математические основы процедуры оценки данной вероятности и условия их применимости.</p>
-<h2>Обозначения</h2>
-<p>Пусть <span class="math">\(\psi_i\)</span> -- вероятность того, что вид присутствует в месте номер <span class="math">\(i\)</span>, <span class="math">\(p_{it}\)</span> -- вероятность того, что
-следы присутствия вида были обнаружены в месте номер <span class="math">\(i\)</span> в ходе обследования номер <span class="math">\(t\)</span> (при условии, что вид
-присутсвовал в данном месте). Пусть <span class="math">\(N\)</span> -- число обследованных мест, а <span class="math">\(T\)</span> -- число проведенных циклов исследований,
-<span class="math">\(n_t\)</span> -- число мест, в которых были найдены следы присутствия вида в ходе обследования номер <span class="math">\(t\)</span>, <span class="math">\(n_{o}\)</span> -- общее количество
-мест, в которых следы присутствия были найдены хотя бы один раз.</p>
-<h2>Процедура сбора данных и предположения, лежащие в ее основе</h2>
-<p>Проводится обследование <span class="math">\(N\)</span> мест (участков), в ходе <span class="math">\(T\)</span> отдельных посещений. Предполагается, что:</p>
-<p>(1) ситуация на участках стабильна, т.е. обследуемые участки заняты (или не заняты) видом в течении всего периода исследований:</p>
-<ul>
-<li>ни одного пустого участка (из исследуемых) за время обследования не было заселено видом;</li>
-<li>ни с одного занятого участка (из исследуемых) не было покинуто видом за время обследования.</li>
-</ul>
-<p>(2) если вид отсутствует на участке, то следы присутствия не будут обнаружены ни при каких условиях (например,
-   не может быть ложных отнесений следов иного вида к исследуемому виду).</p>
-<p>(3) присутствие следов в одном месте не зависит от присустствия (остуствия) следов в других местах.</p>
-<p>В итоге данные обследования по каждому участку сводятся в последовательность нулей и единиц, где 1 означает, что
-вид был обнаружен, а 0 -- не обнаружен. Каждому обседованному участку в конце периода исследований
-прописывается такая последовательность обнаружений/не-обнаружений.</p>
-<h2>Основная модель</h2>
-<p>Модель очень проста и легче всего ее пояснить на примере. Предположим, что в было всего 5 этапов обследований участков. Предположим,
-что на некотором учаске номер <span class="math">\(i\)</span> была зафиксирована следующая история наблюдений: 01010. Тогда вероятность получить данную историю
-наблюдений равняется:</p>
-<div class="math">$$
-\psi_i (1-p_{i1})p_{i2}(1-p_{i3})p_{i4}(1-p_{i5})
-$$</div>
-<p>В случае, когда на участке не было ни одного обнаружения следов вида за всю историю наблюдений (в нашем пример -- пять нулей, 00000),
-возможны варианты: (а) животных там и в самом деле нет (б) животных попросту не удалось обнаружить. Поэтому если на участке <span class="math">\(k\)</span> не было
-ни одного обнаружения, то вероятность получить такую историю наблюдений равняется:</p>
-<div class="math">$$
-\psi_k \prod_{t=1}^5 (1 - p_{kt}) + (1-\psi_k).
-$$</div>
-<p>Подобным же образом строятся вероятности получить наблюдаемые истории присутствия следов в общем случае. Однако, полученная модель
-будет иметь слишком много параметров, чтобы ее можно было оценить по имеющимся наблюдениям, поэтому модель необходимо упростить.
-Наиболее простой вариант -- предположить, что вероятность присутствия вида и обнаружения следов являются константами. В этом
-случае  можно построить функцию правдоподобия по результатам всех наблюдений на всех участках:</p>
-<div class="math">$$
-L(\psi, \mathbf{p}) = \big[\psi^{n_{o}}\prod_{t=1}^T p^{n_t}_t (1-p_t)^{n_{o} - n_t} \big] \times \big[\psi \prod_{t=1}^T (1-p_t)+ (1-\psi) \big].
-$$</div>
-<p>Таким образом задача сводится к тому, чтобы подобрать такие параметры <span class="math">\(\psi\)</span>, <span class="math">\(p_1, p_2, \dots, p_n\)</span>, которые обеспечивают достижения
-максимума функции <span class="math">\(L\)</span>.</p>
-<h3>Развитие модели</h3>
-<h4>Факторы</h4>
-<p>Логично предположить, что вероятность присутсвия вида на некотором участке зависит от неких геоэкологических факторов. Аналогично,
-вероятность обнаружения также может меняться в зависимости от определенных параметров, например, погодных. Такие факторы
-могут быть встроены в модель, например, можно ее расширить при помощи логистической функции -- потребовать, чтобы величина <span class="math">\(\psi\)</span>
-удовлетворяла следующей зависимости от объясняющих факторов <span class="math">\(\mathbf{X}\)</span> и параметров модели <span class="math">\(\mathbf{B}\)</span>:</p>
-<div class="math">$$
-\psi_i = \frac{e^\mathbf{XB}}{1 + e^\mathbf{XB}}.
-$$</div>
-<p>
-Аналогично моделируется величина <span class="math">\(p\)</span>.</p>
-<h4>Отсутсвующие наблюдения</h4>
-<p>Не всегда возможно получить одинаковое количество наблюдений за участками. Например, для какого-либо учатка возможна такая история наблюдений:
-10-11, когда было пропущено третье по счету исследование. В этом случае функция правдоподобия для данного участка будет выглядеть
-следующим образом:</p>
-<div class="math">$$
-\psi p_1 (1-p_2) p_4 p_5.
-$$</div>
-<p>В таком случае, чтобы учесть отсутствующие наблюдения, придется вычислять параметры для каждого участка по отдельности,
-а не в общем виде.</p>
-<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
-    var align = "center",
-        indent = "0em",
-        linebreak = "false";
-
-    if (false) {
-        align = (screen.width < 768) ? "left" : align;
-        indent = (screen.width < 768) ? "0em" : indent;
-        linebreak = (screen.width < 768) ? 'true' : linebreak;
-    }
-
-    var mathjaxscript = document.createElement('script');
-    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
-    mathjaxscript.type = 'text/javascript';
-    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
-
-    var configscript = document.createElement('script');
-    configscript.type = 'text/x-mathjax-config';
-    configscript[(window.opera ? "innerHTML" : "text")] =
-        "MathJax.Hub.Config({" +
-        "    config: ['MMLorHTML.js']," +
-        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
-        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
-        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
-        "    displayAlign: '"+ align +"'," +
-        "    displayIndent: '"+ indent +"'," +
-        "    showMathMenu: true," +
-        "    messageStyle: 'normal'," +
-        "    tex2jax: { " +
-        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
-        "        displayMath: [ ['$$','$$'] ]," +
-        "        processEscapes: true," +
-        "        preview: 'TeX'," +
-        "    }, " +
-        "    'HTML-CSS': { " +
-        "        availableFonts: ['STIX', 'TeX']," +
-        "        preferredFont: 'STIX'," +
-        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
-        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
-        "    }, " +
-        "}); " +
-        "if ('default' !== 'default') {" +
-            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
-                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
-                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
-                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
-                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
-                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
-            "});" +
-        "}";
-
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
-}
-</script>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+<p>Ранее уже рассматривалось несколько работ, посвященных оценке ореала животных по следам …</p>
+                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/estimating-site-occupancy-rates-when-detection-probabilities-are-less-than-on.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
@@ -382,33 +387,6 @@ P. Olofsson, G. M. Foody, M. Herold, S. V. Stehman, C. E. Woodcock, and M. A. Wu
 нужно подготовить к анализу снимки (<a href="https://kolesovdmitry.github.io/logbook/predobrabotka-dannykh-sentinel-2-v-google-earthengine.html">см., скажем, этот пример</a>),
 а затем сгенерировать набор точек и прочитать под этими точками значения яркостей каналов полученных снимков …</p>
                 <a class="readmore" href="https://kolesovdmitry.github.io/logbook/sozdanie-obuchaiushchikh-dannykh-v-gee-dlia-klassifikatsii-vneshnimi-resursami.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="https://kolesovdmitry.github.io/logbook/realizatsiia-metodiki-iz-stati-development-of-a-global-90-m-water-body-map-na-baze-sentinel-2.html" rel="bookmark"
-                           title="Permalink to Реализация методики из статьи "Development of a global ~90 m water body map..." на базе Sentinel-2">Реализация методики из статьи "Development of a global ~90 m water body map..." на базе Sentinel-2</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2019-12-25T00:00:00+03:00">
-                Published: Ср 25 декабря 2019
-        </abbr>
-
-        <address class="vcard author">
-                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
-        </address>
-<p>In <a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a>.</p>
-<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/sentinel-2.html">Sentinel-2</a> <a href="https://kolesovdmitry.github.io/logbook/tag/remote-sensing.html">Remote Sensing</a> <a href="https://kolesovdmitry.github.io/logbook/tag/gee.html">GEE</a> <a href="https://kolesovdmitry.github.io/logbook/tag/water.html">Water</a> </p>
-</footer><!-- /.post-info -->                <h1>Задача</h1>
-<p>Ранее описывалась <a href="https://kolesovdmitry.github.io/logbook/development-of-a-global-90-m-water-body-map-using-multi-temporal-landsat-images.html">методика поиска водных объектов</a>, разработанная для Landsat. Она
-позволяет строить карты постоянных водных объектов, временно затапливаемых территорий, а также похожих на них по своим спектральным свойствам участков (лед, солончаки, и т.п.).
-Ниже рассматривается реализация "в лоб", выполненная в GEE на базе Sentinel-2.</p>
-<h1>Сложности</h1>
-<p>Исходная методика была …</p>
-                <a class="readmore" href="https://kolesovdmitry.github.io/logbook/realizatsiia-metodiki-iz-stati-development-of-a-global-90-m-water-body-map-na-baze-sentinel-2.html">read more</a>
                 </div><!-- /.entry-content -->
             </article></li>
                 </ol><!-- /#posts-list -->
