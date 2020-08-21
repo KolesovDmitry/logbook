@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+        <meta charset="utf-8" />
+        <title>Трюк с аппроксимацией кусочно-линейной функцией</title>
+        <link rel="stylesheet" href="https://kolesovdmitry.github.io/logbook/theme/css/main.css" />
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="https://kolesovdmitry.github.io/logbook/">Список всего </a></h1>
+                <nav><ul>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/change-detection.html">Change Detection</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/gee.html">GEE</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/neuralnets.html">NeuralNets</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/raster-processing.html">Raster Processing</a></li>
+                    <li><a href="https://kolesovdmitry.github.io/logbook/category/review.html">Review</a></li>
+                    <li class="active"><a href="https://kolesovdmitry.github.io/logbook/category/stats.html">Stats</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="https://kolesovdmitry.github.io/logbook/triuk-s-approksimatsiei-kusochno-lineinoi-funktsiei.html" rel="bookmark"
+           title="Permalink to Трюк с аппроксимацией кусочно-линейной функцией">Трюк с аппроксимацией кусочно-линейной функцией</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2020-08-20T00:00:00+03:00">
+                Published: Чт 20 августа 2020
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://kolesovdmitry.github.io/logbook/author/dmitry-kolesov.html">Dmitry Kolesov</a>
+        </address>
+<p>In <a href="https://kolesovdmitry.github.io/logbook/category/stats.html">Stats</a>.</p>
+<p>tags: <a href="https://kolesovdmitry.github.io/logbook/tag/gam.html">GAM</a> </p>
+</footer><!-- /.post-info -->      <p>Разбираюсь с внутренним устройством аддитивных моделей, смотрю, как работает функция gam из пакета mgcv в R, параллельно читаю теорию в книге S. N. Wood, "Generalized Additive Models".</p>
+<p>Наткнулся на восхитительный трюк, который не приходил мне в голову -- очень изящное решение часто возникающей задачи. Представим себе такую ситуацию: есть некоторое облако точек на плоскости (в многомерном пространстве аналогично, но на плоскости нагляднее). Мы хотим построить кусочно-линейную аппроксимацию этого облака. Основная идея, того, что хочется получить в итоге, показана на рисунке.</p>
+<p><img alt="Пример" src="images/2020-08-20/result.png" title="Пример кусочно-линейной аппроксимации."></p>
+<p>Оказывается, задачу можно решить буквально в несколько матричных умножений, логика там такая:</p>
+<ol>
+<li>Требуется аппроксимировать некоторую функцию.</li>
+<li>Будем работать с функциями как с элементами векторного пространства.</li>
+<li>Вектор можно разложить на сумму базисных векторов, в нашем случае -- представить искомую фунцию в виде суммы 
+   базисных функций.</li>
+<li>Весь вопрос в подходящем выборе базиса и вычисления коэффициентов разложения.</li>
+</ol>
+<h2>Детали</h2>
+<h3>Подготовительный этап</h3>
+<p>Сгенерируем пример, с которым будем работать:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+
+<span class="n">N</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="n">N</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="s1">&#39;o&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p><img alt="Пример точек" src="images/2020-08-20/points.png" title="Тестовый пример."></p>
+<p>Пусть область область определения неизвестной функции разбита на отрезки при помощи узловых точек:
+<span class="math">\(\{x_j: j=1, \dots, k\}\)</span>, <span class="math">\(x_j &gt; x_{j-1}\)</span>. 
+В качестве базисных функций возьмем функции, определенные в окрестности узлов:</p>
+<div class="math">$$
+b_j = \begin{cases} \frac{x-x_{j-1}}{x_j-x_{j-1}}, \qquad x_{j-1}&lt; x \leq x_j\\ \frac{x_{j+1}-x}{x_{j+1}-x_j}, \qquad x_{j}&lt; x \leq x_{j+1} \\ 0, \qquad \text{иначе}  \end{cases}
+$$</div>
+<p>
+А в начальном и конечном узле функции определяются так:</p>
+<div class="math">$$
+b_1 = \begin{cases} \frac{x_{2}-x}{x_{2}-x_1}, \qquad x &lt; x_{2} \\ 0, \qquad \text{иначе}  \end{cases}, 
+$$</div>
+<div class="math">$$
+b_k = \begin{cases} \frac{x-x_{k-1}}{x_k - x_{k-1}}, \qquad x &gt;x_{k-1} \\ 0, \qquad \text{иначе}  \end{cases}
+$$</div>
+<p>Эти функции легко запрограммировать следующим образом:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">tent</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xj</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+  <span class="n">dj</span> <span class="o">=</span> <span class="n">xj</span> <span class="o">*</span> <span class="mi">0</span>
+  <span class="n">dj</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+  <span class="n">interp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xj</span><span class="p">,</span> <span class="n">dj</span><span class="p">)</span>
+
+  <span class="k">return</span> <span class="n">interp</span>
+</pre></div>
+
+
+<p>Функция tent принимает на вход набор точек, для которых нужно вычилить значение функции, набор узлов и номер функции, например так выглядят три функции, заданные 
+для узлов [0, 4, 8]:</p>
+<div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+  <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">9</span><span class="p">),</span> <span class="n">tent</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">9</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">]),</span> <span class="n">j</span><span class="p">))</span>
+</pre></div>
+
+
+<p><img alt="Пример функций" src="images/2020-08-20/tents.png" title="Пример функций."></p>
+<p>Следующий шаг -- построение матрицы значений базисных функций в заданных точках. Для удобства определяем функцию:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">tent_matrix</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xj</span><span class="p">):</span>
+  <span class="n">nk</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">xj</span><span class="p">)</span>
+  <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+  <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="n">nk</span><span class="p">))</span>
+  <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nk</span><span class="p">):</span>
+    <span class="n">X</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">tent</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xj</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span>
+
+  <span class="k">return</span> <span class="n">X</span>
+</pre></div>
+
+
+<p>Например, постоим матрицу значений базисных функций в точках 0, 1, ... 8 для базисных функций, определяемых узлами 0, 4, 8:</p>
+<div class="highlight"><pre><span></span><span class="n">tent_matrix</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">9</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">]))</span>
+
+<span class="n">array</span><span class="p">([[</span><span class="mf">1.</span>  <span class="p">,</span> <span class="mf">0.</span>  <span class="p">,</span> <span class="mf">0.</span>  <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.</span>  <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.5</span> <span class="p">,</span> <span class="mf">0.5</span> <span class="p">,</span> <span class="mf">0.</span>  <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.</span>  <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.</span>  <span class="p">,</span> <span class="mf">1.</span>  <span class="p">,</span> <span class="mf">0.</span>  <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.</span>  <span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.</span>  <span class="p">,</span> <span class="mf">0.5</span> <span class="p">,</span> <span class="mf">0.5</span> <span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.</span>  <span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">],</span>
+       <span class="p">[</span><span class="mf">0.</span>  <span class="p">,</span> <span class="mf">0.</span>  <span class="p">,</span> <span class="mf">1.</span>  <span class="p">]])</span>
+</pre></div>
+
+
+<h3>Подгонка кривых</h3>
+<p>В общем-то сам этам расчетов состоит из поиска коэффициентов разложения аппроксимируемой функции на базисные функции методом наименьших квадратов:</p>
+<div class="highlight"><pre><span></span><span class="n">sj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>  <span class="c1"># Выберем 7 базисных функций (узлов)</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">tent_matrix</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">sj</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">lstsq</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">appr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">appr</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Результат работы показан на рисунке:</p>
+<p><img alt="Пример" src="images/2020-08-20/result.png" title="Пример кусочно-линейной аппроксимации."></p>
+<p>Для полноты картины выведу коэффициенты разложения:</p>
+<div class="highlight"><pre><span></span><span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">array</span><span class="p">([</span> <span class="mf">0.67347735</span><span class="p">,</span> <span class="o">-</span><span class="mf">3.06728294</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.3785451</span> <span class="p">,</span>  <span class="mf">0.81588507</span><span class="p">,</span>  <span class="mf">1.93119414</span><span class="p">,</span>
+        <span class="mf">3.22027169</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.55155735</span><span class="p">])</span>
+</pre></div>
+
+
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
